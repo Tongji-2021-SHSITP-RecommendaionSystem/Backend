@@ -1,0 +1,6 @@
+{
+	"/api/user/hasUser": [true],
+	"/api/user/login": [true],
+	"/api/user/register": [true],
+	"/api/user/sendEmail": [true]
+}
