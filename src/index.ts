@@ -112,12 +112,14 @@ Database.create().then(database => {
 			.findOneByConditions(User, { email: query.email as string })
 			.then(async user => {
 				if (!user)
-					response.status(403).send("Email not registered");
+					response.status(401).send("Email not registered");
 				else if (user.session)
 					response.status(400).send("User already logged in");
+				else if (user.password != query.password)
+					response.status(401).send("Wrong password");
 				else {
 					response.locals.session.user = user;
-					database.sessions.update(response.locals.session).then((success) => {
+					database.sessions.update(response.locals.session).then(success => {
 						success
 							? response.status(200).send("Logged in successfully")
 							: response.sendStatus(500);
@@ -217,7 +219,7 @@ Database.create().then(database => {
 		}
 	});
 
-	app.listen(8080, () => console.log("App listening on 8080"));
+	app.listen(8081, () => console.log("App listening on 8081"));
 
 	const sessionCleaner = setInterval(() => {
 		database
