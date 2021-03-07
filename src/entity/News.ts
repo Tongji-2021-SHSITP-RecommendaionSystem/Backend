@@ -1,20 +1,36 @@
+import Cheerio = require("cheerio");
 import { Column, Entity, ManyToMany, PrimaryGeneratedColumn } from "typeorm"
-import { User } from "./User";
+import User from "./User";
 
 @Entity()
-export class News {
+export default class News {
 	@PrimaryGeneratedColumn()
-	id: number;
+	id: string;
+
+	@Column({ unique: true })
+	url: string;
 
 	@Column("text")
 	title: string;
 
 	@Column("longtext")
-	content: string;
+	article: string;
 
 	@Column({ type: "text", nullable: true })
-	source: string;
+	source?: string;
 
-	@ManyToMany(type => User, user => user.viewed)
-	readers: User[];
+	@Column({ nullable: true })
+	date?: Date;
+
+	@Column({ type: "text", nullable: true })
+	image?: string;
+
+	@ManyToMany(type => User, user => user.viewed, {
+		persistence: false
+	})
+	readers?: User[];
+
+	get content(): string {
+		return Cheerio.load(this.article)("div.post_body").text();
+	}
 }
