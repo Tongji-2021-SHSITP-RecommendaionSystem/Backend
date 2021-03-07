@@ -19,7 +19,7 @@ export interface Article {
 	item_id: string,
 	is_feed_ad: boolean,
 	behot_time: number,
-	image_url: string,
+	image_url?: string,
 	group_id: string,
 	middle_image: string
 }

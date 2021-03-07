@@ -1,9 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, OneToOne } from "typeorm";
-import { News } from "./News";
-import { Session } from "./Session";
+import News from "./News";
+import Session from "./Session";
 
 @Entity()
-export class User {
+export default class User {
     @PrimaryGeneratedColumn()
     id: number;
 

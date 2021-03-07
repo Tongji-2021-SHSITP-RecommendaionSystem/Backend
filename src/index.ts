@@ -8,8 +8,8 @@ import Zlib = require("zlib");
 import Mail = require("nodemailer/lib/mailer");
 import Database from "./database";
 import { verifyRequest } from "./validation";
-import { User } from "./entity/User";
-import { Session } from "./entity/Session";
+import User from "./entity/User";
+import Session from "./entity/Session";
 import { Reqface, pattern } from "./reqface"
 import { EmailTemplate } from "./config";
 

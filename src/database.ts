@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { Connection, createConnection, EntityTarget, FindConditions, Repository } from "typeorm";
-import { User } from "./entity/User"
-import { Session } from "./entity/Session"
+import User from "./entity/User"
+import Session from "./entity/Session"
 
 class SessionManager {
     readonly length: number;
@@ -82,9 +82,13 @@ export default class Database {
         return this.connection.getRepository(target);
     }
     async has<Entity>(entity: EntityTarget<Entity>, id: number | string): Promise<boolean> {
-        return this.connection.getRepository(entity).findOne(id).then(value => {
-            return value != undefined && value != null;
-        })
+        return this.connection.getRepository(entity).findOne(id).then(
+            value => value != undefined && value != null,
+            error => {
+                console.log(error);
+                return false;
+            }
+        )
     }
     async findById<Entity>(entity: EntityTarget<Entity>, id: number | string, select?: (keyof Entity)[]): Promise<Entity> {
         return select ? this.connection.getRepository(entity).findOne(id, { select: select }) :

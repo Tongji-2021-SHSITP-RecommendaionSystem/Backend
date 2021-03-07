@@ -1,8 +1,8 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryColumn } from "typeorm"
-import { User } from "./User";
+import User from "./User";
 
 @Entity()
-export class Session {
+export default class Session {
     @PrimaryColumn("char", { length: 16 })
     id: string
 
