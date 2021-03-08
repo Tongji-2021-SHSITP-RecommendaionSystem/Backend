@@ -5,7 +5,7 @@ import User from "./User";
 @Entity()
 export default class News {
 	@PrimaryGeneratedColumn()
-	id: string;
+	id: number;
 
 	@Column({ unique: true })
 	url: string;

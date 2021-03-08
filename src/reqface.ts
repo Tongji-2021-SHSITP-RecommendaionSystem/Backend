@@ -16,6 +16,14 @@ export namespace Reqface {
 		export interface SendEmail {
 			email: string;
 		}
+		export interface ReadNews {
+			id: string;
+		}
+	}
+	export namespace News {
+		export interface GetNews {
+			id: string;
+		}
 	}
 }
 export const pattern = {

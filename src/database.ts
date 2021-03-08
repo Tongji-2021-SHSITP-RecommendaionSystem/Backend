@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { Connection, createConnection, EntityTarget, FindConditions, Repository } from "typeorm";
+import { Connection, createConnection, EntityTarget, FindConditions, Repository, SaveOptions } from "typeorm";
 import User from "./entity/User"
 import Session from "./entity/Session"
 
@@ -89,6 +89,11 @@ export default class Database {
                 return false;
             }
         )
+    }
+    save<Entity>(entities: Entity[], options?: SaveOptions): Promise<Entity[]>;
+    save<Entity>(entity: Entity, options?: SaveOptions): Promise<Entity>;
+    async save<Entity>(target: Entity | Entity[], options?: SaveOptions): Promise<Entity | Entity[]> {
+        return this.connection.manager.save(target, options);
     }
     async findById<Entity>(entity: EntityTarget<Entity>, id: number | string, select?: (keyof Entity)[]): Promise<Entity> {
         return select ? this.connection.getRepository(entity).findOne(id, { select: select }) :

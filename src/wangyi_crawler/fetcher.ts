@@ -20,9 +20,12 @@ export default class WangYiFetcher {
 		return new Promise((resolve, reject) =>
 			Axios.post(
 				"https://api.apiopen.top/getWangYiNews",
+				null,
 				{
-					page: page.toString(),
-					count: count.toString()
+					params: {
+						page: page.toString(),
+						count: count.toString()
+					}
 				}
 			).then(
 				(response: AxiosResponse<ApiResponse>) => resolve(response.data.result),

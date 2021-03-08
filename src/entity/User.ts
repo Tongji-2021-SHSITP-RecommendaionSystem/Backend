@@ -23,8 +23,7 @@ export default class User {
     readonly session?: Session;
 
     @ManyToMany(type => News, news => news.readers, {
-        eager: true,
-        persistence: false,
+        eager: true
     })
     @JoinTable({ name: "user-view-news" })
     viewed?: News[];

@@ -4,7 +4,6 @@ import cookieParser = require("cookie-parser");
 import bodyParser = require("body-parser");
 import nodemailer = require("nodemailer");
 import FileSystem = require("fs");
-import Zlib = require("zlib");
 import Mail = require("nodemailer/lib/mailer");
 import Database from "./database";
 import { verifyRequest } from "./validation";
@@ -12,6 +11,7 @@ import User from "./entity/User";
 import Session from "./entity/Session";
 import { Reqface, pattern } from "./reqface"
 import { EmailTemplate } from "./config";
+import News from "./entity/News";
 
 type APIRestraintTuple = [boolean];
 class API {
@@ -128,6 +128,21 @@ Database.create().then(database => {
 			});
 	});
 
+	app.get("/api/news/getNews", (request, response) => {
+		if (!verifyRequest("Parameter", request, response, ["id", /^[0-9]+$/]))
+			return;
+		const id = Number.parseInt((request.query as object as Reqface.News.GetNews).id);
+		database.findById(News, id).then(
+			news => {
+				if (news != null && news != undefined)
+					response.status(200).json(news);
+				else
+					response.status(404).send("News not found")
+			},
+			error => response.sendStatus(500)
+		);
+	})
+
 	app.post("/api/user/sendEmail", async (request, response) => {
 		if (!verifyRequest("Parameter", request, response, ["email", pattern.email, [1, 64]]))
 			return;
@@ -217,6 +232,21 @@ Database.create().then(database => {
 					});
 				});
 		}
+	});
+
+	app.post("/api/user/readNews", (request, response) => {
+		if (!verifyRequest("Parameter", request, response, ["id", /^[0-9]+$/]))
+			return;
+		const user = ((response.locals.session) as Session).user;
+		const news = new News();
+		news.id = Number.parseInt((request.query as object as Reqface.User.ReadNews).id);
+		if (!user.viewed?.length)
+			user.viewed = new Array<News>();
+		user.viewed.push(news);
+		database.save(user).then(
+			_ => response.sendStatus(200),
+			_ => response.sendStatus(500)
+		)
 	});
 
 	app.listen(8081, () => console.log("App listening on 8081"));
