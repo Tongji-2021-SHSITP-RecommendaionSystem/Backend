@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
 
 export type LengthConstraint = [number, number?];
-export type Constraint = Function | boolean | RegExp | LengthConstraint;
-export type KeyConstraint = [string, ...Constraint[]];
+export type NonTypeConstraint = boolean | RegExp | LengthConstraint;
+export type Constraint = Function | NonTypeConstraint;
+export type KeyConstraint<T extends Constraint> = [string, ...T[]];
 class Restraint {
 	type: Function = String
 	nullable?: boolean
@@ -29,7 +30,7 @@ export enum FailureReason {
 	Short = "lower length limit exceeded",
 	Redundant = "redundant"
 }
-export function satisfyConstraints(obj: object, ...constraints: KeyConstraint[]): boolean | [string, FailureReason] {
+export function satisfyConstraints(obj: object, ...constraints: KeyConstraint<Constraint>[]): true | [string, FailureReason] {
 	const keys = Object.keys(obj);
 	const constraintKeys = new Array<string>();
 	for (const constraint of constraints) {
@@ -68,13 +69,13 @@ export function satisfyConstraints(obj: object, ...constraints: KeyConstraint[])
 			return [key, FailureReason.Redundant];
 	return true;
 }
-export function verifyRequest(type: "Parameter" | "Payload", request: Request, response: Response, ...constraints: KeyConstraint[]): boolean {
-	const verified = type == "Parameter" ? request.query : request.body;
-	const result = satisfyConstraints(verified, ...constraints);
-	if (result === true)
-		return true;
-	else {
+export function validateParameter(request: Request, response: Response, ...constraints: KeyConstraint<NonTypeConstraint>[]): void {
+	const result = satisfyConstraints(request.query, ...constraints);
+	if (result !== true)
 		response.status(400).send(`${result[0]} : ${result[1]}`);
-		return false;
-	}
+}
+export function validatePayload(request: Request, response: Response, ...constraints: KeyConstraint<Constraint>[]): void {
+	const result = satisfyConstraints(request.body, ...constraints);
+	if (result !== true)
+		response.status(400).send(`${result[0]} : ${result[1]}`);
 }

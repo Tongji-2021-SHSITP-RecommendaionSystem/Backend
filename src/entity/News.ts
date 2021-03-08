@@ -16,11 +16,11 @@ export default class News {
 	@Column("longtext")
 	article: string;
 
-	@Column({ type: "text", nullable: true })
-	source?: string;
+	@Column("text")
+	source: string;
 
-	@Column({ nullable: true })
-	date?: Date;
+	@Column()
+	date: Date;
 
 	@Column({ type: "text", nullable: true })
 	image?: string;

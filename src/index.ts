@@ -6,7 +6,7 @@ import nodemailer = require("nodemailer");
 import FileSystem = require("fs");
 import Mail = require("nodemailer/lib/mailer");
 import Database from "./database";
-import { verifyRequest } from "./validation";
+import { validateParameter, validatePayload } from "./validation";
 import User from "./entity/User";
 import Session from "./entity/Session";
 import { Reqface, pattern } from "./reqface"
@@ -92,8 +92,7 @@ Database.create().then(database => {
 	});
 
 	app.get("/api/user/hasUser", (request, response) => {
-		if (!verifyRequest("Parameter", request, response, ["email", pattern.email, [1, 64]]))
-			return;
+		validateParameter(request, response, ["email", pattern.email, [1, 64]]);
 		const query = request.query as object as Reqface.User.HasUser;
 		database.findOneByConditions(User, { email: query.email as string }).then(user => {
 			response.json({
@@ -103,10 +102,10 @@ Database.create().then(database => {
 	});
 
 	app.get("/api/user/login", (request, response) => {
-		if (!verifyRequest("Parameter", request, response,
+		validateParameter(request, response,
 			["email", pattern.email, [1, 64]],
 			["password", [1, 32]]
-		)) return;
+		);
 		const query = request.query as object as Reqface.User.Login;
 		database
 			.findOneByConditions(User, { email: query.email as string })
@@ -129,8 +128,7 @@ Database.create().then(database => {
 	});
 
 	app.get("/api/news/getNews", (request, response) => {
-		if (!verifyRequest("Parameter", request, response, ["id", /^[0-9]+$/]))
-			return;
+		validateParameter(request, response, ["id", /^[0-9]+$/]);
 		const id = Number.parseInt((request.query as object as Reqface.News.GetNews).id);
 		database.findById(News, id).then(
 			news => {
@@ -144,8 +142,7 @@ Database.create().then(database => {
 	})
 
 	app.post("/api/user/sendEmail", async (request, response) => {
-		if (!verifyRequest("Parameter", request, response, ["email", pattern.email, [1, 64]]))
-			return;
+		validateParameter(request, response, ["email", pattern.email, [1, 64]]);
 		const query = request.query as object as Reqface.User.SendEmail;
 		let metadata = response.locals.session.metadata;
 		metadata = metadata ? JSON.parse(metadata) : {};
@@ -189,13 +186,12 @@ Database.create().then(database => {
 	});
 
 	app.post("/api/user/register", (request, response) => {
-		if (!verifyRequest(
-			"Payload", request, response,
-			["username", pattern.username, [1, 32]],
-			["password", [1, 32]],
-			["email", pattern.email, [1, 64]],
-			["verificationCode", /^[a-z0-9]{4}$/i]
-		)) return;
+		validatePayload(request, response,
+			["username", String, pattern.username, [1, 32]],
+			["password", String, [1, 32]],
+			["email", String, pattern.email, [1, 64]],
+			["verificationCode", String, /^[a-z0-9]{4}$/i]
+		);
 		const metadata = response.locals.session.metadata
 			? JSON.parse(response.locals.session.metadata)
 			: {};
@@ -235,8 +231,11 @@ Database.create().then(database => {
 	});
 
 	app.post("/api/user/readNews", (request, response) => {
-		if (!verifyRequest("Parameter", request, response, ["id", /^[0-9]+$/]))
-			return;
+		validateParameter(request, response,
+			["id", pattern.number],
+			["startTime", pattern.number],
+			["endTime", pattern.number]
+		);
 		const user = ((response.locals.session) as Session).user;
 		const news = new News();
 		news.id = Number.parseInt((request.query as object as Reqface.User.ReadNews).id);
