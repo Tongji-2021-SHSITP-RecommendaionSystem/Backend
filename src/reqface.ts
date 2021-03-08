@@ -1,32 +1,20 @@
+type RecordString<T extends string> = Record<T, string>;
+type Optionalize<T> = { [K in keyof T]?: T[K] };
 export namespace Reqface {
 	export namespace User {
-		export interface HasUser {
-			email: string;
-		}
-		export interface Login {
-			email: string;
-			password: string;
-		}
-		export interface Register {
-			username: string;
-			password: string;
-			email: string;
-			verificationCode: string;
-		}
-		export interface SendEmail {
-			email: string;
-		}
-		export interface ReadNews {
-			id: string;
-		}
+		export type HasUser = RecordString<"email">
+		export type Login = RecordString<"email" | "password">
+		export type Register = RecordString<"username" | "password" | "email" | "verificationCode">
+		export type SendEmail = RecordString<"email">
+		export type ReadNews = RecordString<"id" | "startTime" | "endTime">
+		export type Recommend = Optionalize<RecordString<"count">>
 	}
 	export namespace News {
-		export interface GetNews {
-			id: string;
-		}
+		export type GetNews = RecordString<"id">
 	}
 }
 export const pattern = {
+	number: /^[0-9]+$/,
 	email: /^\w+@\w+\.+\w+$/,
 	username: /^[a-z0-9\-_]+$/i
 }
