@@ -9,7 +9,7 @@ import Database from "./database";
 import { validateParameter, validatePayload } from "./validation";
 import User from "./entity/User";
 import Session from "./entity/Session";
-import { Reqface, pattern } from "./reqface"
+import { API, pattern } from "./api"
 import { EmailTemplate } from "./config";
 import News from "./entity/News";
 
@@ -93,12 +93,19 @@ Database.create().then(database => {
 
 	app.get("/api/user/hasUser", (request, response) => {
 		validateParameter(request, response, ["email", pattern.email, [1, 64]]);
-		const query = request.query as object as Reqface.User.HasUser;
-		database.findOneByConditions(User, { email: query.email as string }).then(user => {
-			response.json({
-				exist: user != null && user != undefined,
-			});
-		});
+		const query = request.query as object as API.User.HasUser.Request;
+		database.findOneByConditions(User, { email: query.email as string }).then(
+			user => {
+				const result: API.User.HasUser.Response = {
+					exist: user != null && user != undefined
+				}
+				response.json(result);
+			},
+			error => {
+				console.log(error);
+				response.sendStatus(500);
+			}
+		);
 	});
 
 	app.get("/api/user/login", (request, response) => {
@@ -106,7 +113,7 @@ Database.create().then(database => {
 			["email", pattern.email, [1, 64]],
 			["password", [1, 32]]
 		);
-		const query = request.query as object as Reqface.User.Login;
+		const query = request.query as object as API.User.Login.Request;
 		database
 			.findOneByConditions(User, { email: query.email as string })
 			.then(async user => {
@@ -127,9 +134,17 @@ Database.create().then(database => {
 			});
 	});
 
+	app.get("/api/user/recommend", (request, response) => {
+		validateParameter(request, response, ["count", true, pattern.number]);
+		const count = Number.parseInt((request.query as object as API.User.Recommend.Request).count ?? "6");
+		const user = ((response.locals.session) as Session).user;
+		if (!(user.viewed?.length >= 3)) {
+		}
+	});
+
 	app.get("/api/news/getNews", (request, response) => {
 		validateParameter(request, response, ["id", /^[0-9]+$/]);
-		const id = Number.parseInt((request.query as object as Reqface.News.GetNews).id);
+		const id = Number.parseInt((request.query as object as API.News.GetNews.Request).id);
 		database.findById(News, id).then(
 			news => {
 				if (news != null && news != undefined)
@@ -143,7 +158,7 @@ Database.create().then(database => {
 
 	app.post("/api/user/sendEmail", async (request, response) => {
 		validateParameter(request, response, ["email", pattern.email, [1, 64]]);
-		const query = request.query as object as Reqface.User.SendEmail;
+		const query = request.query as object as API.User.SendEmail.Request;
 		let metadata = response.locals.session.metadata;
 		metadata = metadata ? JSON.parse(metadata) : {};
 		if (metadata.mailTime && Date.now() < metadata.mailTime + 60000)
@@ -154,13 +169,13 @@ Database.create().then(database => {
 			if (await database.findOneByConditions(User, { email: query.email }))
 				return response.status(403).send("Email address already registered");
 			const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-			let verificationCode: string;
+			let code: string;
 			do {
-				verificationCode = "";
+				code = "";
 				for (let i = 0; i < 4; ++i)
-					verificationCode += charset.charAt(Math.floor(Math.random() * charset.length));
-			} while (verificationCode.length != 4);
-			const mail = new EmailTemplate(query.email as string, verificationCode);
+					code += charset.charAt(Math.floor(Math.random() * charset.length));
+			} while (code.length != 4);
+			const mail = new EmailTemplate(query.email as string, code);
 			const transporter = nodemailer.createTransport(mail.config);
 			const mailOptions: Mail.Options = {
 				from: mail.config.auth.user,
@@ -175,7 +190,7 @@ Database.create().then(database => {
 				}
 				else {
 					metadata.mailTime = Date.now();
-					metadata.verificationCode = verificationCode;
+					metadata.code = code;
 					response.locals.session.metadata = JSON.stringify(metadata);
 					database.sessions.update(response.locals.session);
 					console.log("Email sent: " + info.response);
@@ -190,13 +205,13 @@ Database.create().then(database => {
 			["username", String, pattern.username, [1, 32]],
 			["password", String, [1, 32]],
 			["email", String, pattern.email, [1, 64]],
-			["verificationCode", String, /^[a-z0-9]{4}$/i]
+			["code", String, /^[a-z0-9]{4}$/i]
 		);
 		const metadata = response.locals.session.metadata
 			? JSON.parse(response.locals.session.metadata)
 			: {};
 		if (metadata.mailTime && Date.now() > metadata.mailTime + 600000) {
-			delete metadata.verificationCode;
+			delete metadata.code;
 			delete metadata.mailTime;
 			response.locals.session.metadata = JSON.stringify(metadata);
 			database.sessions.update(response.locals.session);
@@ -204,13 +219,13 @@ Database.create().then(database => {
 		}
 		else if (response.locals.session.user)
 			response.status(400).send("User already logged in");
-		else if (!metadata.verificationCode)
+		else if (!metadata.code)
 			response.status(400).send("Verification email not sent");
-		else if (metadata.verificationCode != request.body.verificationCode)
+		else if (metadata.code != request.body.code)
 			response.status(403).send("Wrong verification code");
 		else {
 			const newUser = new User();
-			const payload = request.body as object as Reqface.User.Register;
+			const payload = request.body as object as API.User.Register.Request;
 			newUser.username = payload.username;
 			newUser.password = payload.password;
 			newUser.email = payload.email;
@@ -218,14 +233,15 @@ Database.create().then(database => {
 				.getTable(User)
 				.save(newUser)
 				.then((user) => {
-					delete metadata.verificationCode;
+					delete metadata.code;
 					delete metadata.mailTime;
 					response.locals.session.user = user;
 					response.locals.session.metadata = JSON.stringify(metadata);
 					database.sessions.update(response.locals.session);
-					response.status(201).json({
-						id: user.id,
-					});
+					const result: API.User.Register.Response = {
+						id: user.id
+					}
+					response.status(201).json(result);
 				});
 		}
 	});
@@ -238,7 +254,7 @@ Database.create().then(database => {
 		);
 		const user = ((response.locals.session) as Session).user;
 		const news = new News();
-		news.id = Number.parseInt((request.query as object as Reqface.User.ReadNews).id);
+		news.id = Number.parseInt((request.query as object as API.User.ReadNews.Request).id);
 		if (!user.viewed?.length)
 			user.viewed = new Array<News>();
 		user.viewed.push(news);

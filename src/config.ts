@@ -13,10 +13,10 @@ export class EmailTemplate {
 		}
 	}
 	content: string
-	constructor(target: string, verificationCode: string) {
+	constructor(target: string, code: string) {
 		const html = parseHtml(FileSystem.readFileSync("email.html").toString());
 		html.querySelector("#target").set_content(target);
-		html.querySelector("#verificationCode").set_content(verificationCode);
+		html.querySelector("#code").set_content(code);
 		this.content = html.toString();
 	}
 }
