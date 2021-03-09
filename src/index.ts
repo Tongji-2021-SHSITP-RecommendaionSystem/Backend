@@ -5,41 +5,24 @@ import bodyParser = require("body-parser");
 import nodemailer = require("nodemailer");
 import FileSystem = require("fs");
 import Mail = require("nodemailer/lib/mailer");
+import SMTPTransport = require("nodemailer/lib/smtp-transport");
 import Database from "./database";
-import { validateParameter, validatePayload } from "./validation";
 import User from "./entity/User";
 import Session from "./entity/Session";
-import { API, pattern } from "./api"
-import { EmailTemplate } from "./config";
 import News from "./entity/News";
+import { parse as parseHtml } from "node-html-parser";
+import { validateParameter, validatePayload } from "./validation";
+import { API, pattern } from "./api"
 
-type APIRestraintTuple = [boolean];
-class API {
-	private restrictions: Map<string, APIRestraintTuple>;
-	constructor(configFile?: string) {
-		FileSystem.readFile(configFile ?? "api.json", "utf8", (error, data) => {
-			if (error) throw error;
-			else {
-				const json = JSON.parse(data);
-				this.restrictions = new Map(Object.entries(json) as [string, APIRestraintTuple][]);
-			}
-		});
-	}
-	has = (path: string) => this.restrictions.has(path);
-	authorized = (path: string, user: User): true | string => {
-		const target = this.restrictions.get(path);
-		return (target[0] || user) ? true : "Login required";
-	};
-}
-const APIs = new API();
 
 Database.create().then(database => {
 	const app: express.Application = express();
 	app.enable("trust proxy");
 	app.use(cookieParser(), bodyParser.json(), (_request, _response, next) => next());
+	const apis = new API.Accessibility();
 	//API existence
 	app.use("/api", (request, response, next) => {
-		if (!APIs.has("/api" + request.path)) response.status(400).send("API not supported");
+		if (!apis.has("/api" + request.path)) response.status(400).send("API not supported");
 		else next();
 	});
 	//Session
@@ -86,7 +69,7 @@ Database.create().then(database => {
 	});
 	//API authentification
 	app.use("/api", (request, response, next) => {
-		const result = APIs.authorized("/api" + request.path, response.locals.session.user);
+		const result = apis.authorized("/api" + request.path, response.locals.session.user);
 		if (result === true) next();
 		else response.status(401).send(result);
 	});
@@ -143,7 +126,7 @@ Database.create().then(database => {
 	});
 
 	app.get("/api/news/getNews", (request, response) => {
-		validateParameter(request, response, ["id", /^[0-9]+$/]);
+		validateParameter(request, response, ["id", pattern.number]);
 		const id = Number.parseInt((request.query as object as API.News.GetNews.Request).id);
 		database.findById(News, id).then(
 			news => {
@@ -156,6 +139,8 @@ Database.create().then(database => {
 		);
 	})
 
+	const smtpConfig = JSON.parse(FileSystem.readFileSync("smptconfig.json").toString()) as SMTPTransport.Options;
+	const emailTemplate = parseHtml(FileSystem.readFileSync("email.html").toString());
 	app.post("/api/user/sendEmail", async (request, response) => {
 		validateParameter(request, response, ["email", pattern.email, [1, 64]]);
 		const query = request.query as object as API.User.SendEmail.Request;
@@ -175,13 +160,14 @@ Database.create().then(database => {
 				for (let i = 0; i < 4; ++i)
 					code += charset.charAt(Math.floor(Math.random() * charset.length));
 			} while (code.length != 4);
-			const mail = new EmailTemplate(query.email as string, code);
-			const transporter = nodemailer.createTransport(mail.config);
+			emailTemplate.querySelector("#target").set_content(query.email);
+			emailTemplate.querySelector("#code").set_content(code);
+			const transporter = nodemailer.createTransport(smtpConfig);
 			const mailOptions: Mail.Options = {
-				from: mail.config.auth.user,
+				from: smtpConfig.auth.user,
 				to: query.email,
-				subject: "昨日头条验证邮件",
-				html: mail.content,
+				subject: "闻所未闻验证邮件",
+				html: emailTemplate.toString(),
 			};
 			transporter.sendMail(mailOptions, (error, info) => {
 				if (error) {
