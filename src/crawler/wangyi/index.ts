@@ -23,7 +23,11 @@ export default class WangYiCrawler {
 					const result = new Array<News>();
 					await newsInfos.forEachAsync(async newsInfo =>
 						await this.downloader.getPage(newsInfo.path).then(
-							html => result.push(WangYiExtractor.getNews(newsInfo, html)),
+							html => {
+								const news = WangYiExtractor.getNews(newsInfo, html);
+								if (news != null && news != undefined)
+									result.push(news);
+							},
 							error => console.log(new Date(), error)
 						) as void
 					);

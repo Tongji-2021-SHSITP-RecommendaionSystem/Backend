@@ -3,8 +3,10 @@ import News from "../../entity/News";
 import { ApiNewsInfo } from "./interface";
 
 export default class WangYiExtractor {
-	public static getNews(response: ApiNewsInfo, html: string): News {
+	public static getNews(response: ApiNewsInfo, html: string): News | undefined {
 		const $ = Cheerio.load(html);
+		if ($("div.post_body").length == 0)
+			return undefined;
 		const news = new News();
 		news.url = response.path;
 		news.title = response.title;
