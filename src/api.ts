@@ -23,14 +23,19 @@ export namespace API {
 		export namespace ReadNews {
 			export type Request = RecordString<"id" | "startTime" | "endTime">
 		}
-		export namespace Recommend {
-			export type Request = Optionalize<RecordString<"count">>
-		}
 	}
 	export namespace News {
 		export namespace GetNews {
 			export type Request = RecordString<"id">;
 			export type Response = InstanceType<typeof News>
+		}
+		export namespace GetNewsInfos {
+			export type Request = Record<"ids", string[]>;
+			export type Response = Record<"infos", News[]>
+		}
+		export namespace Recommend {
+			export type Request = Optionalize<RecordString<"count">>
+			export type Response = Record<"ids", number[]>
 		}
 	}
 	type APIRestraintTuple = [boolean];

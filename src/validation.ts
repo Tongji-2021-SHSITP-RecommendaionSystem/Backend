@@ -1,25 +1,26 @@
 import { Request, Response } from "express";
+import { ParamsDictionary } from "express-serve-static-core"
 
 export type LengthConstraint = [number, number?];
 export type NonTypeConstraint = boolean | RegExp | LengthConstraint;
 export type Constraint = Function | NonTypeConstraint;
-export type KeyConstraint<T extends Constraint> = [string, ...T[]];
+export type KeyConstraint<KeySource extends Object, T extends Constraint = Constraint> = [Extract<keyof KeySource, string>, ...T[]];
 class Restraint {
 	type: Function = String
 	nullable?: boolean
 	length?: LengthConstraint
 	pattern?: RegExp
-	assign(pConstraint: Constraint): void {
-		if (!pConstraint)
+	assign(constraint: Constraint): void {
+		if (!constraint)
 			return;
-		if (typeof pConstraint == "boolean")
-			this.nullable = pConstraint;
-		else if (pConstraint instanceof RegExp)
-			this.pattern = pConstraint;
-		else if (pConstraint instanceof Function)
-			this.type = pConstraint;
+		if (typeof constraint == "boolean")
+			this.nullable = constraint;
+		else if (constraint instanceof RegExp)
+			this.pattern = constraint;
+		else if (constraint instanceof Function)
+			this.type = constraint;
 		else
-			this.length = pConstraint;
+			this.length = constraint;
 	}
 }
 export enum FailureReason {
@@ -30,34 +31,35 @@ export enum FailureReason {
 	Short = "lower length limit exceeded",
 	Redundant = "redundant"
 }
-export function satisfyConstraints(obj: object, ...constraints: KeyConstraint<Constraint>[]): true | [string, FailureReason] {
-	const keys = Object.keys(obj);
+export function satisfyConstraints<T extends Object>(target: T, ...constraints: KeyConstraint<T>[]): true | [string, FailureReason] {
+	const keys = Object.keys(target);
 	const constraintKeys = new Array<string>();
 	for (const constraint of constraints) {
-		constraintKeys.push(constraint[0]);
+		let key: string = constraint[0];
+		constraintKeys.push(key);
 		const restraint: Restraint = new Restraint();
 		restraint.assign(constraint[1]);
 		restraint.assign(constraint[2]);
 		restraint.assign(constraint[3]);
 		restraint.assign(constraint[4]);
 		if (keys.includes(constraint[0])) {
-			if (obj[constraint[0]].constructor != restraint.type)
-				return [constraint[0], FailureReason.Type];
-			else if (restraint.pattern && !restraint.pattern.test(typeof obj[constraint[0]] == "string" ? obj[constraint[0]] : obj[constraint[0]].toString()))
-				return [constraint[0], FailureReason.Pattern];
+			if (target[key].constructor != restraint.type)
+				return [key, FailureReason.Type];
+			else if (restraint.pattern && !restraint.pattern.test(typeof target[key] == "string" ? target[key] : target[key].toString()))
+				return [key, FailureReason.Pattern];
 			else if (restraint.length) {
-				if (typeof obj[constraint[0]] == "string") {
-					if (obj[constraint[0]].length < restraint.length[0])
-						return [constraint[0], FailureReason.Short];
-					else if (restraint.length[1] && obj[constraint[0]].length > restraint.length[1])
-						return [constraint[0], FailureReason.Long];
+				if (typeof target[key] == "string") {
+					if (target[key].length < restraint.length[0])
+						return [key, FailureReason.Short];
+					else if (restraint.length[1] && target[key].length > restraint.length[1])
+						return [key, FailureReason.Long];
 				}
 				else {
-					const str = obj[constraint[0]].toString();
+					const str = target[key].toString();
 					if (str.length < restraint.length[0])
-						return [constraint[0], FailureReason.Short];
+						return [key, FailureReason.Short];
 					else if (restraint.length[1] && str.length > restraint.length[1])
-						return [constraint[0], FailureReason.Long];
+						return [key, FailureReason.Long];
 				}
 			}
 		}
@@ -69,13 +71,15 @@ export function satisfyConstraints(obj: object, ...constraints: KeyConstraint<Co
 			return [key, FailureReason.Redundant];
 	return true;
 }
-export function validateParameter(request: Request, response: Response, ...constraints: KeyConstraint<NonTypeConstraint>[]): void {
+export function validateParameter<ReqQuery>(request: Request<ParamsDictionary, any, any, ReqQuery>, response: Response, ...constraints: KeyConstraint<ReqQuery, NonTypeConstraint | typeof Array>[]): ReturnType<typeof satisfyConstraints> {
 	const result = satisfyConstraints(request.query, ...constraints);
 	if (result !== true)
 		response.status(400).send(`${result[0]} : ${result[1]}`);
+	return result;
 }
-export function validatePayload(request: Request, response: Response, ...constraints: KeyConstraint<Constraint>[]): void {
+export function validatePayload<ReqBody extends Record<string, any>>(request: Request<ParamsDictionary, any, ReqBody>, response: Response, ...constraints: KeyConstraint<ReqBody>[]): ReturnType<typeof satisfyConstraints> {
 	const result = satisfyConstraints(request.body, ...constraints);
 	if (result !== true)
 		response.status(400).send(`${result[0]} : ${result[1]}`);
+	return result;
 }
