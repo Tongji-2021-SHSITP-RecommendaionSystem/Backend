@@ -2,8 +2,8 @@ import "basic-type-extensions";
 import TouTiaoFetcher from "./fetcher";
 import TouTiaoDownloader from "./downloader";
 import TouTiaoExtractor from "./extractor";
-import Database from "../database";
-import News from "../entity/News";
+import Database from "../../database";
+import News from "../../entity/News";
 import { Article } from "./interface";
 
 export default class TouTiaoCrawler {

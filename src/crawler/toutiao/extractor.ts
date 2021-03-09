@@ -1,6 +1,6 @@
 import Cheerio = require("cheerio");
 import { Article } from "./interface"
-import News from "../entity/News"
+import News from "../../entity/News"
 
 export default class TouTiaoExtractor {
 	public static getNews(response: Article, html: string): News {
