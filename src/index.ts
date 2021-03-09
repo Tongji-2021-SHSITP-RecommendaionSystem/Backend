@@ -136,6 +136,10 @@ Database.create().then(database => {
 			const count = Number.parseInt(request.query.count ?? "6");
 			const user = ((response.locals.session) as Session).user;
 			if (!(user.viewed?.length >= 3)) {
+
+			}
+			else {
+
 			}
 		}
 	);
@@ -177,7 +181,7 @@ Database.create().then(database => {
 		}
 	);
 
-	const smtpConfig = JSON.parse(FileSystem.readFileSync("smptconfig.json").toString()) as SMTPTransport.Options;
+	const smtpConfig = JSON.parse(FileSystem.readFileSync("smtpconfig.json").toString()) as SMTPTransport.Options;
 	const emailTemplate = parseHtml(FileSystem.readFileSync("email.html").toString());
 	app.post(
 		"/api/user/sendEmail",

@@ -2,7 +2,7 @@ import "basic-type-extensions";
 import WangYiFetcher from "./fetcher"
 import WangYiDownloader from "./downloader"
 import WangYiExtractor from "./extractor"
-import News from "../entity/News";
+import News from "../../entity/News";
 
 export default class WangYiCrawler {
 	protected fetcher: WangYiFetcher;

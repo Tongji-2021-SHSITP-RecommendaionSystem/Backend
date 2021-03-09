@@ -1,5 +1,5 @@
 import Cheerio = require("cheerio")
-import News from "../entity/News";
+import News from "../../entity/News";
 import { ApiNewsInfo } from "./interface";
 
 export default class WangYiExtractor {
@@ -9,9 +9,12 @@ export default class WangYiExtractor {
 		news.url = response.path;
 		news.title = response.title;
 		news.image = response.image;
-		const infos = $("div.post_info").clone().children().remove().end().text().trim().split("来源:");
-		news.date = new Date(infos[0].trim());
-		news.source = infos[1].trim();
+		let infoText = $("div.post_info").text().trim();
+		if (infoText.endsWith("举报"))
+			infoText = infoText.substr(0, infoText.length - 2).trimRight();
+		const infos = infoText.split(/来源[:：]/);
+		news.date = new Date(infos[0].trimRight());
+		news.source = infos[1].trimLeft();
 		news.article = $("div.post_body").html();
 		return news;
 	}
