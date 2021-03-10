@@ -31,6 +31,6 @@ export default class News {
 	readers?: User[];
 
 	get content(): string {
-		return Cheerio.load(this.article)("div.post_body").text();
+		return Cheerio.load(this.article)("*").text();
 	}
 }
