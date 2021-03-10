@@ -82,7 +82,7 @@ Database.create().then(database => {
 		if (result === true)
 			next();
 		else
-			response.status(401).end();
+			response.sendStatus(401);
 	});
 
 	app.get(
@@ -117,11 +117,13 @@ Database.create().then(database => {
 						response.status(401).send("Wrong password");
 					else {
 						response.locals.session.user = user;
-						database.sessions.update(response.locals.session).then(success => {
-							success
-								? response.status(200).send("Logged in successfully")
-								: response.sendStatus(500);
-						});
+						database.sessions.update(response.locals.session).then(
+							success => response.sendStatus(success ? 200 : 500),
+							error => {
+								console.log(error);
+								response.sendStatus(500);
+							}
+						);
 					}
 				}
 			);
@@ -136,7 +138,16 @@ Database.create().then(database => {
 			const count = Number.parseInt(request.query.count ?? "6");
 			const user = ((response.locals.session) as Session).user;
 			if (!(user.viewed?.length >= 3)) {
-
+				database.getTable(News).find({
+					take: count,
+					select: ["id"]
+				}).then(
+					newses => response.json({ ids: newses.map(news => news.id) }),
+					error => {
+						console.log(error);
+						response.sendStatus(500);
+					}
+				)
 			}
 			else {
 
