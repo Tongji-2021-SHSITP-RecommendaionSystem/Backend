@@ -51,7 +51,7 @@ export namespace API {
 			});
 		}
 		has(path: string) { return this.restrictions.has(path); }
-		authorized(path: string, user: User): boolean {
+		authorized(path: string, user?: User): boolean {
 			const target = this.restrictions.get(path);
 			return target[0] || user != undefined;
 		};

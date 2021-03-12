@@ -19,6 +19,11 @@ import { ParamsDictionary } from "express-serve-static-core"
 interface ResponseLocal {
 	session?: Session;
 }
+interface Settings {
+	session: {
+		maxAge: number;
+	}
+}
 type Request<ReqQuery = any, ReqBody = any> = express.Request<ParamsDictionary, any, ReqBody, ReqQuery>
 type Response<ResBody = string> = express.Response<ResBody | string, ResponseLocal>
 Database.create().then(database => {
@@ -26,6 +31,7 @@ Database.create().then(database => {
 	app.enable("trust proxy");
 	app.use(cookieParser(), bodyParser.json(), (_request, _response, next) => next());
 	const apis = new API.Accessibility();
+	const settings = JSON.parse(FileSystem.readFileSync("settings.json").toString()) as Settings;
 	//API existence
 	app.use("/api", (request, response: Response, next) => {
 		if (!apis.has("/api" + request.path))
@@ -36,7 +42,7 @@ Database.create().then(database => {
 	//Session
 	app.use("/api", async (request, response: Response, next) => {
 		console.log({
-			time: new Date(),
+			time: new Date().toLocaleTimeString(),
 			url: request.url,
 			path: request.path,
 			params: request.query,
@@ -46,43 +52,38 @@ Database.create().then(database => {
 		async function createSession(): Promise<Session> {
 			const session = await database.sessions.add();
 			response.locals.session = session;
-			response.cookie("sessionId", session.id);
+			response.cookie("sessionId", session.id, { maxAge: settings.session.maxAge });
 			return session;
 		}
 		if (!request.cookies?.sessionId)
 			createSession().then(_ => next());
 		else {
 			const sessionId = request.cookies.sessionId;
-			if (!(await database.sessions.has(sessionId))) {
-				await createSession();
-				request.path == "/user/login"
-					? next()
-					: response.status(401).send("sessionId doesn't exist");
-			} else {
-				database.sessions.get(sessionId).then(async (session) => {
-					if (session.expired()) {
-						database.sessions.delete(sessionId);
-						const newSession = await createSession();
-						if (session.user && request.path != "/user/login")
-							response.status(401).send("Session expired");
-						else next();
-					} else {
-						session.lastAccessDate = new Date();
-						database.sessions.update(session);
-						response.locals.session = session;
-						next();
-					}
-				});
-			}
+			database.sessions.get(sessionId).then(async session => {
+				if (session.expired()) {
+					database.sessions.delete(sessionId);
+					session = undefined;
+				}
+				if (!session) {
+					await createSession();
+					apis.authorized("/api" + request.path) ?
+						next() :
+						response.status(401).send("Session doesn't exist");
+				}
+				else {
+					session.lastAccessDate = new Date();
+					database.sessions.update(session);
+					response.locals.session = session;
+					response.cookie("sessionId", sessionId, { maxAge: settings.session.maxAge });
+					next();
+				}
+			});
 		}
 	});
 	//API authentification
 	app.use("/api", (request, response: Response, next) => {
 		const result = apis.authorized("/api" + request.path, response.locals.session.user);
-		if (result === true)
-			next();
-		else
-			response.sendStatus(401);
+		result === true ? next() : response.sendStatus(401);
 	});
 
 	app.get(
@@ -106,14 +107,13 @@ Database.create().then(database => {
 				["email", pattern.email, [1, 64]],
 				["password", [1, 32]]
 			)) return;
-			const query = request.query as object as API.User.Login.Request;
-			database.findOneByConditions(User, { email: query.email as string }).then(
+			database.findOneByConditions(User, { email: request.query.email }).then(
 				async user => {
 					if (!user)
 						response.status(401).send("Email not registered");
 					else if (user.session)
 						response.status(400).send("User already logged in");
-					else if (user.password != query.password)
+					else if (user.password != request.query.password)
 						response.status(401).send("Wrong password");
 					else {
 						response.locals.session.user = user;
@@ -135,7 +135,7 @@ Database.create().then(database => {
 		(request: Request<API.News.Recommend.Request>, response: Response<API.News.Recommend.Response>) => {
 			if (!validateParameter(request, response, ["count", true, pattern.number]))
 				return;
-			const count = Number.parseInt(request.query.count ?? "6");
+			const count = Number.parseInt(request.query.count ?? "10");
 			const user = ((response.locals.session) as Session).user;
 			if (!(user.viewed?.length >= 3)) {
 				database.getTable(News).find({
