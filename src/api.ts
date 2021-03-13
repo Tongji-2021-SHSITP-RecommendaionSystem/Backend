@@ -1,6 +1,6 @@
-import FileSystem = require("fs");
 import News from "./entity/News";
 import User from "./entity/User";
+import { apiConfig } from "./config"
 
 type RecordString<T extends string> = Record<T, string>;
 type Optionalize<T> = { [K in keyof T]?: T[K] };
@@ -38,21 +38,10 @@ export namespace API {
 			export type Response = Record<"ids", number[]>
 		}
 	}
-	type APIRestraintTuple = [boolean];
 	export class Accessibility {
-		protected restrictions: Map<string, APIRestraintTuple>;
-		constructor(configFile?: string) {
-			FileSystem.readFile(configFile ?? "api.json", "utf8", (error, data) => {
-				if (error) throw error;
-				else {
-					const json = JSON.parse(data);
-					this.restrictions = new Map(Object.entries(json) as [string, APIRestraintTuple][]);
-				}
-			});
-		}
-		has(path: string) { return this.restrictions.has(path); }
-		authorized(path: string, user?: User): boolean {
-			const target = this.restrictions.get(path);
+		public static has(path: string) { return apiConfig.has(path); }
+		public static authorized(path: string, user?: User): boolean {
+			const target = apiConfig.get(path);
 			return target[0] || user != undefined;
 		};
 	}

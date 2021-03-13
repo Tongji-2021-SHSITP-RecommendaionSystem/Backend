@@ -1,6 +1,7 @@
 import FileSystem = require("fs");
-import { PythonShell } from "python-shell"
-import News from "../entity/News"
+import { PythonShell } from "python-shell";
+import settings from "../config";
+import News from "../entity/News";
 
 interface SimpleNews {
 	title: string;
@@ -14,7 +15,7 @@ export default class Recommender {
 	public constructor() {
 		this.shell = new PythonShell(Recommender.script, {
 			mode: "text",
-			pythonPath: JSON.parse(FileSystem.readFileSync("settings.json").toString()).python.path
+			pythonPath: settings.model.pythonPath
 		});
 		this.shell.on("message", message => {
 			this.curResult = JSON.parse(message);

@@ -3,13 +3,13 @@ import express = require("express");
 import cookieParser = require("cookie-parser");
 import bodyParser = require("body-parser");
 import nodemailer = require("nodemailer");
-import FileSystem = require("fs");
 import Mail = require("nodemailer/lib/mailer");
-import SMTPTransport = require("nodemailer/lib/smtp-transport");
 import Database from "./database";
+import Recommender from "./recommendation/shell"
 import User from "./entity/User";
 import Session from "./entity/Session";
 import News from "./entity/News";
+import settings, { smtpConfig, loadFile } from "./config"
 import { parse as parseHtml } from "node-html-parser";
 import { validateParameter, validatePayload } from "./validation";
 import { API, pattern } from "./api"
@@ -19,22 +19,15 @@ import { ParamsDictionary } from "express-serve-static-core"
 interface ResponseLocal {
 	session?: Session;
 }
-interface Settings {
-	session: {
-		maxAge: number;
-	}
-}
 type Request<ReqQuery = any, ReqBody = any> = express.Request<ParamsDictionary, any, ReqBody, ReqQuery>
 type Response<ResBody = string> = express.Response<ResBody | string, ResponseLocal>
 Database.create().then(database => {
 	const app: express.Application = express();
 	app.enable("trust proxy");
 	app.use(cookieParser(), bodyParser.json(), (_request, _response, next) => next());
-	const apis = new API.Accessibility();
-	const settings = JSON.parse(FileSystem.readFileSync("settings.json").toString()) as Settings;
 	//API existence
 	app.use("/api", (request, response: Response, next) => {
-		if (!apis.has("/api" + request.path))
+		if (!API.Accessibility.has("/api" + request.path))
 			response.status(400).send("API not supported");
 		else
 			next();
@@ -66,7 +59,7 @@ Database.create().then(database => {
 				}
 				if (!session) {
 					await createSession();
-					apis.authorized("/api" + request.path) ?
+					API.Accessibility.authorized("/api" + request.path) ?
 						next() :
 						response.status(401).send("Session doesn't exist");
 				}
@@ -82,7 +75,7 @@ Database.create().then(database => {
 	});
 	//API authentification
 	app.use("/api", (request, response: Response, next) => {
-		const result = apis.authorized("/api" + request.path, response.locals.session.user);
+		const result = API.Accessibility.authorized("/api" + request.path, response.locals.session.user);
 		result === true ? next() : response.sendStatus(401);
 	});
 
@@ -130,6 +123,7 @@ Database.create().then(database => {
 		}
 	);
 
+	const recommender = new Recommender();
 	app.get(
 		"/api/news/recommend",
 		(request: Request<API.News.Recommend.Request>, response: Response<API.News.Recommend.Response>) => {
@@ -137,7 +131,7 @@ Database.create().then(database => {
 				return;
 			const count = Number.parseInt(request.query.count ?? "10");
 			const user = ((response.locals.session) as Session).user;
-			if (!(user.viewed?.length >= 3)) {
+			if (!user.viewed?.length) {
 				database.getTable(News).find({
 					take: count,
 					select: ["id"]
@@ -150,7 +144,24 @@ Database.create().then(database => {
 				)
 			}
 			else {
+				const exception = database.getTable(News)
+					.createQueryBuilder("news")
+					.whereInIds(user.viewed.map(news => news.id))
+					.select("id");
+				database.getTable(News)
+					.createQueryBuilder("news")
+					.where(`news.id NOT IN (${exception.getSql()})`)
+					.take(25)
+					.getMany()
+					.then(
+						newses => {
 
+						},
+						error => {
+							console.log(error);
+							response.sendStatus(500);
+						}
+					)
 			}
 		}
 	);
@@ -192,8 +203,7 @@ Database.create().then(database => {
 		}
 	);
 
-	const smtpConfig = JSON.parse(FileSystem.readFileSync("smtpconfig.json").toString()) as SMTPTransport.Options;
-	const emailTemplate = parseHtml(FileSystem.readFileSync("email.html").toString());
+	const emailTemplate = parseHtml(loadFile("email.html"));
 	app.post(
 		"/api/user/sendEmail",
 		async (request: Request<API.User.SendEmail.Request>, response: Response<{ timeLeft: number }>) => {

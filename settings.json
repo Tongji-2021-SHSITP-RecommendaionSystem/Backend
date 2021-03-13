@@ -2,7 +2,8 @@
 	"session": {
 		"maxAge": 1800000
 	},
-	"python": {
-		"path": "D:/Program Files/Python/3.7.9/python.exe"
+	"model": {
+		"pythonPath": "D:/Program Files/Python/3.7.9/python.exe",
+		"concurrency": 5
 	}
 }
