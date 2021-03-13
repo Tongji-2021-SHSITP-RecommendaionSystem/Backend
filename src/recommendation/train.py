@@ -13,7 +13,6 @@ import json
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Text
 import tensorflow as tf
 
 from model.__init__ import Model, TCNNConfig

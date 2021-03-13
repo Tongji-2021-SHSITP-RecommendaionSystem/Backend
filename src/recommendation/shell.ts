@@ -7,7 +7,6 @@ interface SimpleNews {
 	content: string;
 }
 export default class Recommender {
-	public static python = "D:/Program Files/Python/3.7.9/python.exe";
 	public static script = "src/recommendation/train.py";
 	protected shell: PythonShell;
 	protected available: boolean = false;
@@ -15,7 +14,7 @@ export default class Recommender {
 	public constructor() {
 		this.shell = new PythonShell(Recommender.script, {
 			mode: "text",
-			pythonPath: Recommender.python
+			pythonPath: JSON.parse(FileSystem.readFileSync("settings.json").toString()).python.path
 		});
 		this.shell.on("message", message => {
 			this.curResult = JSON.parse(message);
@@ -25,11 +24,10 @@ export default class Recommender {
 	public async execute(viewed: News[], candidates: News[]): Promise<number[]> {
 		return new Promise(async (resolve, reject) => {
 			let body: string = JSON.stringify({
-				viewed: viewed.map(news => ({ title: news.title, content: "" } as SimpleNews)),
-				candidates: candidates.map(news => ({ title: news.title, content: "" } as SimpleNews))
+				viewed: viewed.map(news => ({ title: news.title, content: news.content } as SimpleNews)),
+				candidates: candidates.map(news => ({ title: news.title, content: news.content } as SimpleNews))
 			});
 			this.shell.send(`run ${body}`);
-			FileSystem.writeFileSync("src/recommendation/data.txt", `run ${body}`)
 			new Promise<void>(resolve => {
 				setInterval(() => {
 					if (this.available)
