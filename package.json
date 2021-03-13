@@ -25,11 +25,13 @@
 		"mysql": "^2.14.1",
 		"node-html-parser": "^3.0.3",
 		"nodemailer": "^6.5.0",
+		"python-shell": "^2.0.3",
 		"reflect-metadata": "^0.1.10",
 		"typeorm": "^0.2.31"
 	},
 	"scripts": {
 		"start": "ts-node src/index.ts",
-		"test": "ts-node src/test/test.ts"
+		"test": "ts-node src/test/test.ts",
+		"train": "py -3.7 src/recommendation/train.py"
 	}
 }

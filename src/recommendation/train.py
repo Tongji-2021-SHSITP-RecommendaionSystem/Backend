@@ -6,18 +6,20 @@ Created on Wed Oct 21 22:49:38 2020
 @author: 1952640
 """
 
+from io import TextIOWrapper
 import os
 import sys
 import json
 import time
 from datetime import timedelta
 from pathlib import Path
+from typing import Text
 import tensorflow as tf
 
 from model.__init__ import Model, TCNNConfig
 from dataset import read_vocab, read_category, batch_iter, process_file, build_vocab, test_process_file, test_batch_iter, online_process, open_file
 
-base_dir = Path('src/recommendation')
+base_dir = Path(os.path.dirname(__file__))
 train_path = base_dir/'data'/'train.txt'
 test_path = base_dir/'data'/'test.txt'
 val_path = base_dir/'data'/'val.txt'
@@ -25,7 +27,6 @@ vocab_path = base_dir/'data'/'vocab.txt'
 save_dir = base_dir/'checkpoints'/'final'
 save_path = save_dir/'best_validation'
 tensorboard_dir = base_dir/'tensorboard'/'final'
-input_path = base_dir/'input.json'
 
 
 def get_time_dif(start_time):
@@ -113,7 +114,7 @@ def train():
             # and (total_batch!=0)):
             if ((total_batch % config.print_per_batch == 0)):
                 feed_dict[model.keep_prob] = 1.0
-                #loss_train, acc_train = session.run([model.loss, model.acc], feed_dict=feed_dict)
+                # loss_train, acc_train = session.run([model.loss, model.acc], feed_dict=feed_dict)
                 acc_train = acc/config.print_per_batch
                 loss_train = loss/config.print_per_batch
                 acc = 0
@@ -136,7 +137,7 @@ def train():
                                  loss_val, acc_val, time_dif, improved_str))
 
             feed_dict[model.keep_prob] = config.dropout_keep_prob
-            #res_train = session.run(model.news_encoder.title_attention.attention_query_vector,feed_dict=feed_dict)
+            # res_train = session.run(model.news_encoder.title_attention.attention_query_vector,feed_dict=feed_dict)
             # print(feed_dict)
             # print(res_train)
             # print(feed_dict)
@@ -196,22 +197,22 @@ def test():
     print("Time usage:", time_dif)
 
 
-def grade(data):
-    NEWS = json.loads(data)
+def calc_confidence(data: str) -> list:
+    newses = json.loads(data)
     clicked, candidate, real = online_process(
-        NEWS['viewed'], NEWS['candidates'], word_to_id, config.num_words_title)
+        newses['viewed'], newses['candidates'], word_to_id, config.num_words_title)
     session = tf.Session()
     session.run(tf.global_variables_initializer())
     saver = tf.train.Saver()
-    saver.restore(sess=session, save_path=save_path)
+    saver.restore(sess=session, save_path=str(save_path))
     feed_dict = feed_data([clicked], [candidate], real, 1.0)
     click_predict = session.run(model.click_probability, feed_dict=feed_dict)
-    result = json.dumps(click_predict[0].tolist())
-    print(result)
-    sys.stdout.flush()
+    return click_predict[0].tolist()
 
 
 if __name__ == '__main__':
+    sys.stdout = TextIOWrapper(sys.stdout.buffer, encoding='utf8')
+    sys.stdin = TextIOWrapper(sys.stdin.buffer, encoding='utf8')
     config = TCNNConfig()
     if not os.path.exists(vocab_path):
         build_vocab(train_path, vocab_path, config.vocab_size)
@@ -220,15 +221,10 @@ if __name__ == '__main__':
     config.vocab_size = len(words)
     model = Model(config)
     line: str
-    command: str
-    arguments: list[str]
     for line in sys.stdin:
-        arguments: list[str] = line.split(' ')
-        command = arguments[0]
-        arguments = arguments[1:]
-        if command == 'exit':
+        args = line.strip().split(' ', 1)
+        if args[0] == 'exit':
             break
-        elif command == 'run':
-            file = open(input_path if len(arguments)
-                        == 0 else arguments[0], 'r')
-            grade(file.read())
+        elif args[0] == 'run':
+            print(calc_confidence(args[1]))
+            sys.stdout.flush()
