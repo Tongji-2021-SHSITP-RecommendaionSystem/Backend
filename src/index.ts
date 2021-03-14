@@ -145,16 +145,10 @@ Database.create().then(database => {
 				)
 			}
 			else {
-				const exception = database.getTable(News)
-					.createQueryBuilder("news")
-					.whereInIds(user.viewed.map(news => news.id))
-					.select("id");
 				database.getTable(News)
 					.createQueryBuilder("news")
-					.where(`news.id NOT IN (${exception.getSql()})`)
-					.take(count * 5)
-					.getMany()
-					.then(
+					.where(`news.id NOT IN (${user.viewed.map(news => news.id).toString()})`)
+					.orderBy("RAND()").take(count * 5).getMany().then(
 						newses => {
 							scheduler.recommend(user.viewed, newses).then(
 								result => response.send({ ids: result.slice(0, count).map(value => value[0].id) }),
