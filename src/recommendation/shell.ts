@@ -1,4 +1,3 @@
-import FileSystem = require("fs");
 import { PythonShell } from "python-shell";
 import settings from "../config";
 import News from "../entity/News";
@@ -33,7 +32,7 @@ export default class Recommender {
 				setInterval(() => {
 					if (this.available)
 						resolve();
-				}, 100);
+				}, settings.model.timerInterval);
 			}).then(() => {
 				this.available = false;
 				resolve(this.curResult)

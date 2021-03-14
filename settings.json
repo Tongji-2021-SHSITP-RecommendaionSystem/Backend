@@ -4,6 +4,9 @@
 	},
 	"model": {
 		"pythonPath": "D:/Program Files/Python/3.7.9/python.exe",
-		"concurrency": 5
+		"concurrency": 5,
+		"timerInterval": 50,
+		"maxViewed": 20,
+		"maxCandidates": 5
 	}
 }

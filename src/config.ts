@@ -8,6 +8,9 @@ export interface Settings {
 	model: {
 		pythonPath: string;
 		concurrency: number;
+		timerInterval: number;
+		maxViewed: number;
+		maxCandidates: number;
 	}
 }
 export type APIConfig = Map<string, [boolean]>
