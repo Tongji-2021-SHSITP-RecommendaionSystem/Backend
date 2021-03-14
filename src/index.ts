@@ -2,14 +2,15 @@ import "basic-type-extensions";
 import express = require("express");
 import cookieParser = require("cookie-parser");
 import bodyParser = require("body-parser");
-import nodemailer = require("nodemailer");
+import Mailer = require("nodemailer");
+import FileSystem = require("fs");
 import Mail = require("nodemailer/lib/mailer");
 import Database from "./database";
-import Recommender from "./recommendation/shell"
+import ModelTaskScheduler from "./recommendation/scheduler"
 import User from "./entity/User";
 import Session from "./entity/Session";
 import News from "./entity/News";
-import settings, { smtpConfig, loadFile } from "./config"
+import settings, { smtpConfig } from "./config"
 import { parse as parseHtml } from "node-html-parser";
 import { validateParameter, validatePayload } from "./validation";
 import { API, pattern } from "./api"
@@ -21,6 +22,15 @@ interface ResponseLocal {
 }
 type Request<ReqQuery = any, ReqBody = any> = express.Request<ParamsDictionary, any, ReqBody, ReqQuery>
 type Response<ResBody = string> = express.Response<ResBody | string, ResponseLocal>
+function handleInternalError<T, Res extends express.Response = express.Response>(response: Res, status: number = 500, message?: string) {
+	return (error: T) => {
+		console.log(error);
+		if (message)
+			response.status(status).end(message);
+		else
+			response.sendStatus(status);
+	}
+}
 Database.create().then(database => {
 	const app: express.Application = express();
 	app.enable("trust proxy");
@@ -85,10 +95,7 @@ Database.create().then(database => {
 			if (!validateParameter(request, response, ["email", pattern.email, [1, 64]])) return;
 			database.findOneByConditions(User, { email: request.query.email }).then(
 				user => response.json({ exist: user != null && user != undefined }),
-				error => {
-					console.log(error);
-					response.sendStatus(500);
-				}
+				handleInternalError(response)
 			);
 		}
 	);
@@ -112,10 +119,7 @@ Database.create().then(database => {
 						response.locals.session.user = user;
 						database.sessions.update(response.locals.session).then(
 							success => response.sendStatus(success ? 200 : 500),
-							error => {
-								console.log(error);
-								response.sendStatus(500);
-							}
+							handleInternalError(response)
 						);
 					}
 				}
@@ -123,7 +127,7 @@ Database.create().then(database => {
 		}
 	);
 
-	const recommender = new Recommender();
+	const scheduler = new ModelTaskScheduler();
 	app.get(
 		"/api/news/recommend",
 		(request: Request<API.News.Recommend.Request>, response: Response<API.News.Recommend.Response>) => {
@@ -137,10 +141,7 @@ Database.create().then(database => {
 					select: ["id"]
 				}).then(
 					newses => response.json({ ids: newses.map(news => news.id) }),
-					error => {
-						console.log(error);
-						response.sendStatus(500);
-					}
+					handleInternalError(response)
 				)
 			}
 			else {
@@ -151,16 +152,16 @@ Database.create().then(database => {
 				database.getTable(News)
 					.createQueryBuilder("news")
 					.where(`news.id NOT IN (${exception.getSql()})`)
-					.take(25)
+					.take(count * 5)
 					.getMany()
 					.then(
 						newses => {
-
+							scheduler.recommend(user.viewed, newses).then(
+								result => response.send({ ids: result.slice(0, count).map(value => value[0].id) }),
+								handleInternalError(response)
+							)
 						},
-						error => {
-							console.log(error);
-							response.sendStatus(500);
-						}
+						handleInternalError(response)
 					)
 			}
 		}
@@ -179,7 +180,7 @@ Database.create().then(database => {
 					else
 						response.status(404).send("News not found");
 				},
-				error => response.sendStatus(500)
+				handleInternalError(response)
 			);
 		}
 	);
@@ -195,15 +196,12 @@ Database.create().then(database => {
 				select: ["id", "title", "url", "image", "date", "source"]
 			}).then(
 				newses => response.json({ infos: newses }),
-				error => {
-					console.log(error);
-					response.sendStatus(500);
-				}
+				handleInternalError(response)
 			)
 		}
 	);
 
-	const emailTemplate = parseHtml(loadFile("email.html"));
+	const emailTemplate = parseHtml(FileSystem.readFileSync("email.html").toString());
 	app.post(
 		"/api/user/sendEmail",
 		async (request: Request<API.User.SendEmail.Request>, response: Response<{ timeLeft: number }>) => {
@@ -224,7 +222,7 @@ Database.create().then(database => {
 				} while (code.length != 4);
 				emailTemplate.querySelector("#target").set_content(request.query.email);
 				emailTemplate.querySelector("#code").set_content(code);
-				const transporter = nodemailer.createTransport(smtpConfig);
+				const transporter = Mailer.createTransport(smtpConfig);
 				const mailOptions: Mail.Options = {
 					from: smtpConfig.auth.user,
 					to: request.query.email,

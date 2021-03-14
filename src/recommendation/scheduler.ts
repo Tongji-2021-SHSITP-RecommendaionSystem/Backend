@@ -8,10 +8,9 @@ interface Task {
 	isBusy: boolean;
 	hasExited: boolean;
 }
-export default class Manager {
+export default class ModelTaskScheduler {
 	protected tasks: Array<Task>;
 	public constructor() {
-		console.log(settings.model.concurrency);
 		this.tasks = new Array<Task>(settings.model.concurrency);
 		for (let i = 0; i < settings.model.concurrency; ++i)
 			this.tasks[i] = {
@@ -74,7 +73,7 @@ export default class Manager {
 			const result = new Array<[News, number]>(candidates.length);
 			for (let i = 0; i < candidates.length; ++i)
 				result[i] = [candidates[i], confidence[i]];
-			resolve(result.keySort(member => member[1]));
+			resolve(result.keySort(member => member[1]).reverse());
 		})
 	}
 	public launch(): void {
