@@ -7,13 +7,12 @@ Created on Wed Oct 28 10:02:24 2020
 
 from collections import Counter
 import numpy as np
-import tensorflow.keras as kr
-import os
+from tensorflow import keras
 
 
 def open_file(filename, mode='r'):
     # print(os.getcwd())
-    #open('../data/val.csv', mode='w').write('\n')
+    # open('../data/val.csv', mode='w').write('\n')
     return open(filename, mode, encoding='utf-8', errors='ignore')
 
 
@@ -68,18 +67,16 @@ def build_vocab(train_dir, vocab_dir, vocab_size=5000):
     open_file(vocab_dir, mode='w').write('\n'.join(words) + '\n')
 
 
-def read_vocab(vocab_dir):
-    with open_file(vocab_dir) as fp:
-        words = [_.strip() for _ in fp.readlines()]
-    word_to_id = dict(zip(words, range(len(words))))
-    return words, word_to_id
+def build_vocab(vocab_path):
+    with open_file(vocab_path) as file:
+        characters = [line.strip() for line in file.readlines()]
+    character_ids = dict(zip(characters, range(len(characters))))
+    return characters, character_ids
 
 
-def read_category():
-    categories = []
-    categories = [x for x in categories]
-    cat_to_id = dict(zip(categories, range(len(categories))))
-    return categories, cat_to_id
+def read_category(categories: list = []):
+    catetory_ids = dict(zip(categories, range(len(categories))))
+    return categories, catetory_ids
 
 
 def to_words(content, words):
@@ -91,7 +88,7 @@ def process_file(filename, word_to_id, cat_to_id, max_length=600):
     data_id = []
     for i in range(len(contents)):
         data_id.append([word_to_id[x] for x in contents[i] if x in word_to_id])
-    news = kr.preprocessing.sequence.pad_sequences(data_id, max_length)
+    news = keras.preprocessing.sequence.pad_sequences(data_id, max_length)
     '''
     [1,0,0,0]
     [0,1,0,0]
@@ -157,14 +154,8 @@ def test_process_file(filename, word_to_id, cat_to_id, max_length=600):
     for i in range(len(contents)):
         data_id.append([word_to_id[x] for x in contents[i] if x in word_to_id])
         # label_id.append(cat_to_id[labels[i]])
-    news = kr.preprocessing.sequence.pad_sequences(data_id, max_length)
+    news = keras.preprocessing.sequence.pad_sequences(data_id, max_length)
     # y_pad = kr.utils.to_categorical(label_id, num_classes=len(cat_to_id))
-    '''
-    æ°é»æ é¢æ°é*ç±»å«
-    [1,0,0,0]
-    [0,1,0,0]
-    ....
-    '''
     return news, users, contents  # , y_pad
 
 
@@ -224,31 +215,24 @@ def test_batch_iter(news, users, max_length=600, candidate_num=5, click_num=20, 
         yield batch_click, batch_candidate, batch_real, userno
 
 
-def online_process(clicked_news, candidate_news, word_to_id, max_length=600):
+def preprocess(viewed, candidates, character_ids, max_length=600):
+    viewed_indexified = []
+    for news in viewed:
+        viewed_indexified.append([character_ids[char] for char in list(
+            news['title']+news['content']) if char in character_ids])
+    candidates_indexified = []
+    for news in candidates:
+        candidates_indexified.append([character_ids[char] for char in list(
+            news['title']+news['content']) if char in character_ids])
 
-    clicked_news_full = []
-    candidate_news_full = []
-    for i in range(len(clicked_news)):
-        clicked_news_full.append(
-            list(clicked_news[i]['title']+clicked_news[i]['content']))
-    for i in range(len(candidate_news)):
-        candidate_news_full.append(
-            list(candidate_news[i]['title']+candidate_news[i]['content']))
-
-    clicked_data_id = []
-    for i in range(len(clicked_news_full)):
-        clicked_data_id.append([word_to_id[x]
-                                for x in clicked_news_full[i] if x in word_to_id])
-    candidate_data_id = []
-    for i in range(len(candidate_news_full)):
-        candidate_data_id.append(
-            [word_to_id[x] for x in candidate_news_full[i] if x in word_to_id])
-        # label_id.append(cat_to_id[labels[i]])
-    clicked = kr.preprocessing.sequence.pad_sequences(
-        clicked_data_id[0:20], max_length)
-    if(len(clicked_news) < 20):
-        pad = np.zeros(shape=(20-len(clicked_news), max_length), dtype=np.int)
-        clicked = np.concatenate((clicked, pad))
-    candidate = kr.preprocessing.sequence.pad_sequences(
-        candidate_data_id, max_length)
-    return clicked, candidate, candidate[0]
+    viewed_sequence = keras.preprocessing.sequence.pad_sequences(
+        viewed_indexified[0:20], max_length)
+    if len(viewed) < 20:
+        pad = np.zeros((20-len(viewed), max_length), np.int)
+        viewed_sequence = np.concatenate((viewed_sequence, pad))
+    candidates_sequence = keras.preprocessing.sequence.pad_sequences(
+        candidates_indexified, max_length)
+    if len(candidates) < 5:
+        pad = np.zeros((5-len(candidates), max_length), np.int)
+        candidates_sequence = np.concatenate((candidates_sequence, pad))
+    return viewed_sequence, candidates_sequence, candidates_sequence[0]

@@ -16,7 +16,7 @@ from pathlib import Path
 import tensorflow as tf
 
 from model.__init__ import Model, TCNNConfig
-from dataset import read_vocab, read_category, batch_iter, process_file, build_vocab, test_process_file, test_batch_iter, online_process, open_file
+from dataset import build_vocab, read_category, batch_iter, process_file, build_vocab, test_process_file, test_batch_iter, preprocess
 
 base_dir = Path(os.path.dirname(__file__))
 train_path = base_dir/'data'/'train.txt'
@@ -77,9 +77,9 @@ def train():
     print("Loading training and validation data...")
     start_time = time.time()
     news_train, users_train = process_file(
-        train_path, word_to_id, cat_to_id, config.seq_length)
+        train_path, character_ids, category_ids, config.seq_length)
     news_val, users_val = process_file(
-        val_path, word_to_id, cat_to_id, config.seq_length)
+        val_path, character_ids, category_ids, config.seq_length)
     time_dif = get_time_dif(start_time)
     print("Time usage:", time_dif)
 
@@ -159,7 +159,7 @@ def test():
     print("Loading test data...")
     start_time = time.time()
     news_test, user_test, contents = test_process_file(
-        test_path, word_to_id, cat_to_id, config.seq_length)
+        test_path, character_ids, category_ids, config.seq_length)
 
     session = tf.Session()
     session.run(tf.global_variables_initializer())
@@ -198,15 +198,15 @@ def test():
 
 def calc_confidence(data: str) -> list:
     newses = json.loads(data)
-    clicked, candidate, real = online_process(
-        newses['viewed'], newses['candidates'], word_to_id, config.num_words_title)
+    clicked, candidate, real = preprocess(
+        newses['viewed'], newses['candidates'], character_ids, config.num_words_title)
     session = tf.Session()
     session.run(tf.global_variables_initializer())
     saver = tf.train.Saver()
-    saver.restore(sess=session, save_path=str(save_path))
+    saver.restore(session, str(save_path))
     feed_dict = feed_data([clicked], [candidate], real, 1.0)
-    click_predict = session.run(model.click_probability, feed_dict=feed_dict)
-    return click_predict[0].tolist()
+    prediction = session.run(model.click_probability, feed_dict=feed_dict)
+    return (prediction[0].tolist())[0:len(newses['candidates'])]
 
 
 if __name__ == '__main__':
@@ -215,9 +215,9 @@ if __name__ == '__main__':
     config = TCNNConfig()
     if not os.path.exists(vocab_path):
         build_vocab(train_path, vocab_path, config.vocab_size)
-    categories, cat_to_id = read_category()
-    words, word_to_id = read_vocab(vocab_path)
-    config.vocab_size = len(words)
+    categories, category_ids = read_category()
+    characters, character_ids = build_vocab(vocab_path)
+    config.vocab_size = len(characters)
     model = Model(config)
     line: str
     for line in sys.stdin:
