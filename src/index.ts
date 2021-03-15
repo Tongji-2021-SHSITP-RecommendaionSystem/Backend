@@ -6,7 +6,7 @@ import Mailer = require("nodemailer");
 import FileSystem = require("fs");
 import Mail = require("nodemailer/lib/mailer");
 import Database from "./database";
-import ModelTaskScheduler from "./recommendation/scheduler"
+import ModelTaskAllocator from "./recommendation/allocator"
 import User from "./entity/User";
 import Session from "./entity/Session";
 import News from "./entity/News";
@@ -128,7 +128,7 @@ Database.create().then(database => {
 		}
 	);
 
-	const scheduler = new ModelTaskScheduler();
+	const scheduler = new ModelTaskAllocator();
 	app.get(
 		"/api/news/recommend",
 		(request: Request<API.News.Recommend.Request>, response: Response<API.News.Recommend.Response>) => {

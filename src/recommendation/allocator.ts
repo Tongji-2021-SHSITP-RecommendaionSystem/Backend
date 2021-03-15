@@ -7,7 +7,7 @@ interface Task {
 	shell: Recommender;
 	isBusy: boolean;
 }
-export default class ModelTaskScheduler {
+export default class ModelTaskAllocator {
 	protected tasks: Map<number, Task>;
 	public constructor() {
 		this.tasks = new Map();
