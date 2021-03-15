@@ -33,6 +33,7 @@ function handleInternalError<T, Res extends express.Response = express.Response>
 }
 Database.create().then(database => {
 	const app: express.Application = express();
+	const port = 8081;
 	app.enable("trust proxy");
 	app.use(cookieParser(), bodyParser.json(), (_request, _response, next) => next());
 	//API existence
@@ -63,7 +64,7 @@ Database.create().then(database => {
 		else {
 			const sessionId = request.cookies.sessionId;
 			database.sessions.get(sessionId).then(async session => {
-				if (session.expired()) {
+				if (session?.expired()) {
 					database.sessions.delete(sessionId);
 					session = undefined;
 				}
@@ -134,7 +135,7 @@ Database.create().then(database => {
 			if (!validateParameter(request, response, ["count", true, pattern.number]))
 				return;
 			const count = Number.parseInt(request.query.count ?? "10");
-			const user = ((response.locals.session) as Session).user;
+			const user = response.locals.session.user;
 			if (!user.viewed?.length) {
 				database.getTable(News).find({
 					take: count,
@@ -251,7 +252,7 @@ Database.create().then(database => {
 				["code", String, /^[a-z0-9]{4}$/i]
 			)) return;
 			const metadata = response.locals.session.metadata ? JSON.parse(response.locals.session.metadata) : {};
-			if (metadata.mailTime && Date.now() > metadata.mailTime + 600000) {
+			if (metadata.mailTime && Date.now() > metadata.mailTime + 60000) {
 				delete metadata.code;
 				delete metadata.mailTime;
 				response.locals.session.metadata = JSON.stringify(metadata);
@@ -293,7 +294,7 @@ Database.create().then(database => {
 				["startTime", pattern.number],
 				["endTime", pattern.number]
 			)) return;
-			const user = ((response.locals.session) as Session).user;
+			const user = response.locals.session.user;
 			const news = new News();
 			news.id = Number.parseInt((request.query as object as API.User.ReadNews.Request).id);
 			if (!user.viewed?.length)
@@ -306,7 +307,16 @@ Database.create().then(database => {
 		}
 	);
 
-	app.listen(8081, () => console.log("App listening on 8081"));
+	app.post(
+		"/api/user/logout",
+		(request: Request, response: Response) => {
+			response.clearCookie("sessionId");
+			database.sessions.delete(response.locals.session!.id);
+			response.sendStatus(200);
+		}
+	);
+
+	app.listen(port, () => console.log(`App listening on ${port}`));
 
 	const sessionCleaner = setInterval(() => {
 		database

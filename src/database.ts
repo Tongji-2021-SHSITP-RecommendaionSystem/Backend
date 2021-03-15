@@ -1,12 +1,12 @@
 import "reflect-metadata";
 import { Connection, createConnection, EntityTarget, FindConditions, Repository, SaveOptions } from "typeorm";
-import User from "./entity/User"
-import Session from "./entity/Session"
+import User from "./entity/User";
+import Session from "./entity/Session";
+import settings from "./config";
 
 class SessionManager {
     readonly length: number;
     readonly charset: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    maxAge: number = 600000;
     protected readonly connection: Connection;
     constructor(connection: Connection, length: number = 16) {
         this.length = length;
@@ -31,7 +31,7 @@ class SessionManager {
     add(user: User, maxAge?: number): Promise<Session>;
     async add(param1?: User | number, param2?: number): Promise<Session> {
         let session = new Session();
-        session.maxAge = typeof param1 == "number" ? param1 : (param2 != undefined ? param2 : this.maxAge);
+        session.maxAge = typeof param1 == "number" ? param1 : (param2 != undefined ? param2 : settings.session.maxAge);
         const user = param1 instanceof User ? param1 : null;
         if (!user) {
             do {
