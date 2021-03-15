@@ -6,17 +6,18 @@ Created on Wed Oct 21 22:49:38 2020
 @author: 1952640
 """
 
-from io import TextIOWrapper
 import os
 import sys
 import json
 import time
+from io import TextIOWrapper
 from datetime import timedelta
 from pathlib import Path
 import tensorflow as tf
+from typing import *
 
-from model.__init__ import Model, TCNNConfig
-from dataset import build_vocab, read_category, batch_iter, process_file, build_vocab, test_process_file, test_batch_iter, preprocess
+from model import Model, TCNNConfig
+from dataset import *
 
 base_dir = Path(os.path.dirname(__file__))
 train_path = base_dir/'data'/'train.txt'
@@ -34,14 +35,12 @@ def get_time_dif(start_time):
     return timedelta(seconds=int(round(time_dif)))
 
 
-def feed_data(click, candidate, real, keep_prob):
-    feed_dict = {
-        model.input_click: click,
-        model.input_candidate: candidate,
-        # model.real_len: real,
+def feed_data(viewed, candidates, keep_prob):
+    return {
+        model.input_click: viewed,
+        model.input_candidate: candidates,
         model.keep_prob: keep_prob
     }
-    return feed_dict
 
 
 def evaluate(sess, x_, y_):
@@ -97,13 +96,13 @@ def train():
     flag = False
     for epoch in range(config.num_epochs):
         print('Epoch:', epoch + 1)
-        batch_train = batch_iter(news_train, users_train, batch_size=config.batch_size,
-                                 max_length=config.num_words_title, candidate_num=config.candidate_len)
+        batch_train = batch_iter(
+            news_train, users_train, batch_size=config.batch_size, max_length=config.num_words_title, candidate_num=config.candidate_len)
         acc = 0
         loss = 0
         for click, candidate, real in batch_train:
-            feed_dict = feed_data(click, candidate, real,
-                                  config.dropout_keep_prob)
+            feed_dict = feed_data(
+                click, candidate, real, config.dropout_keep_prob)
 
             # print(x_batch.shape[0],x_batch.shape[1])
             if total_batch % config.save_per_batch == 0:
@@ -132,15 +131,15 @@ def train():
                 time_dif = get_time_dif(start_time)
                 msg = 'Iter: {0:>6}, Train Loss: {1:>6.2}, Train Acc: {2:>7.2%},' \
                     + ' Val Loss: {3:>6.2}, Val Acc: {4:>7.2%}, Time: {5} {6}'
-                print(msg.format(total_batch, loss_train, acc_train,
-                                 loss_val, acc_val, time_dif, improved_str))
+                print(msg.format(
+                    total_batch, loss_train, acc_train, loss_val, acc_val, time_dif, improved_str))
 
             feed_dict[model.keep_prob] = config.dropout_keep_prob
             # res_train = session.run(model.news_encoder.title_attention.attention_query_vector,feed_dict=feed_dict)
             # print(feed_dict)
             # print(res_train)
             # print(feed_dict)
-            # session.run(model.optim, feed_dict=feed_dict)  # è¿è¡ä¼å
+            # session.run(model.optim, feed_dict=feed_dict)
             _loss, _acc, optim = session.run(
                 [model.loss, model.acc, model.optim], feed_dict=feed_dict)
             loss += _loss
@@ -165,9 +164,8 @@ def test():
     session.run(tf.global_variables_initializer())
     saver = tf.train.Saver()
     saver.restore(sess=session, save_path=save_path)
-    batch_test = test_batch_iter(news_test, user_test, batch_size=config.batch_size,
-                                 max_length=config.num_words_title, candidate_num=config.candidate_len)
-    count = 0
+    batch_test = test_batch_iter(
+        news_test, user_test, batch_size=config.batch_size, max_length=config.num_words_title, candidate_num=config.candidate_len)
     for click, candidate, real, nolist in batch_test:
         feed_dict = feed_data(click, candidate, real, 1.0)
         click_predict = session.run(
@@ -197,22 +195,24 @@ def test():
 
 
 def calc_confidence(data: str) -> list:
-    newses = json.loads(data)
-    clicked, candidate, real = preprocess(
+    newses: Dict[str, List[Dict[str, str]]] = json.loads(data)
+    viewed_groups, candidates_groups = preprocess(
         newses['viewed'], newses['candidates'], character_ids, config.num_words_title)
     session = tf.Session()
     session.run(tf.global_variables_initializer())
     saver = tf.train.Saver()
     saver.restore(session, str(save_path))
-    feed_dict = feed_data([clicked], [candidate], real, 1.0)
-    prediction = session.run(model.click_probability, feed_dict=feed_dict)
-    return (prediction[0].tolist())[0:len(newses['candidates'])]
+    feed_dict = feed_data(viewed_groups, candidates_groups, 1.0)
+    prediction: np.ndarray = session.run(
+        model.confidence, feed_dict=feed_dict)
+    return [value for group in prediction.tolist() for value in group][0:len(newses['candidates'])]
 
 
 if __name__ == '__main__':
     sys.stdout = TextIOWrapper(sys.stdout.buffer, encoding='utf8')
     sys.stdin = TextIOWrapper(sys.stdin.buffer, encoding='utf8')
     config = TCNNConfig()
+    config.batch_size = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     if not os.path.exists(vocab_path):
         build_vocab(train_path, vocab_path, config.vocab_size)
     categories, category_ids = read_category()

@@ -6,88 +6,51 @@ import News from "../entity/News";
 interface Task {
 	shell: Recommender;
 	isBusy: boolean;
-	hasExited: boolean;
 }
 export default class ModelTaskScheduler {
-	protected tasks: Array<Task>;
+	protected tasks: Map<number, Task>;
 	public constructor() {
-		this.tasks = new Array<Task>(settings.model.concurrency);
-		for (let i = 0; i < settings.model.concurrency; ++i)
-			this.tasks[i] = {
-				shell: new Recommender(),
-				isBusy: false,
-				hasExited: false
-			}
-	}
-	protected async schedule(viewed: News[], candidates: News[], confidence: number[], startIndex: number): Promise<void> {
-		function attempt(tasks: Task[]): boolean {
-			for (const task of tasks) {
-				if (!task.isBusy) {
-					task.isBusy = true;
-					task.shell.execute(viewed, candidates).then(result => {
-						result.forEach((value, index) => confidence[startIndex + index] = value);
-						task.isBusy = false;
-					})
-					return true;
-				}
-			}
-			return false;
-		}
-		return new Promise(resolve => {
-			if (attempt(this.tasks))
-				resolve();
-			else {
-				const timer = setInterval(
-					() => {
-						if (attempt(this.tasks)) {
-							clearInterval(timer);
-							resolve();
-						}
-					},
-					settings.model.timerInterval
-				)
-			}
-		})
+		this.tasks = new Map();
 	}
 	public async recommend(viewed: News[], candidates: News[]): Promise<Array<[News, number]>> {
-		this.launch();
 		return new Promise(async (resolve, reject) => {
-			const confidence = new Array<number>(candidates.length);
-			viewed = viewed.slice(0, settings.model.maxViewed);
-			let groupsCount = Math.ceil(candidates.length / settings.model.maxCandidates);
-			for (let i = 0; i < groupsCount; ++i) {
-				let startIndex = i * settings.model.maxCandidates;
-				await this.schedule(viewed, candidates.slice(startIndex, startIndex + settings.model.maxCandidates), confidence, startIndex)
-			}
-			await new Promise<void>(resolve => {
-				const timer = setInterval(
-					() => {
-						if (this.tasks.every(task => !task.isBusy)) {
-							clearInterval(timer);
-							resolve();
-						}
+			viewed = viewed.shuffle().slice(0, settings.model.maxViewed);
+			const batchSize = Math.ceil(candidates.length / settings.model.candidatesPerBatch);
+			this.getTask(batchSize).then(task => {
+				task.shell.execute(viewed, candidates).then(
+					confidence => {
+						const result = new Array<[News, number]>(candidates.length);
+						for (let i = 0; i < candidates.length; ++i)
+							result[i] = [candidates[i], confidence[i]];
+						resolve(result.keySort(member => member[1]).reverse());
 					},
-					settings.model.timerInterval
-				);
+					error => reject(error)
+				)
 			});
-			const result = new Array<[News, number]>(candidates.length);
-			for (let i = 0; i < candidates.length; ++i)
-				result[i] = [candidates[i], confidence[i]];
-			resolve(result.keySort(member => member[1]).reverse());
 		})
 	}
 	public launch(): void {
-		for (const task of this.tasks)
-			if (task.hasExited) {
-				task.shell = new Recommender();
-				task.hasExited = false;
-			}
+		this.tasks.forEach(task => task.shell.launch());
 	}
 	public exit(): void {
-		for (const task of this.tasks)
-			if (!task.hasExited) {
-				task.shell.exit();
-				task.hasExited = true;
+		this.tasks.forEach(task => task.shell.exit());
+	}
+	protected async getTask(batchSize: number): Promise<Task> {
+		return new Promise(async resolve => {
+			if (this.tasks.has(batchSize)) {
+				const task = this.tasks.get(batchSize);
+				if (task.isBusy)
+					await Promise.wait(() => !task.isBusy, settings.model.timerInterval);
+				resolve(task);
 			}
+			else {
+				const task: Task = {
+					shell: new Recommender(batchSize),
+					isBusy: false
+				}
+				this.tasks.set(batchSize, task);
+				resolve(task);
+			}
+		});
 	}
 }
