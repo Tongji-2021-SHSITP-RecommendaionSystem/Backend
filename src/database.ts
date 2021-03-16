@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import "basic-type-extensions";
 import { Connection, createConnection, EntityTarget, FindConditions, Repository, SaveOptions } from "typeorm";
 import User from "./entity/User";
 import Session from "./entity/Session";
@@ -24,8 +25,11 @@ class SessionManager {
     async has(sessionId: string): Promise<boolean> {
         return (await this.get(sessionId)) != undefined;
     }
-    get(sessionId: string): Promise<Session> {
-        return this.connection.manager.findOne(Session, sessionId, { relations: ["user"] });
+    async get(sessionId: string): Promise<Session> {
+        const session = await this.connection.manager.findOne(Session, sessionId, { relations: ["user"] });
+        if (!Object.isNullOrUndefined(session.user))
+            session.user.viewed = session.user.newsRecords.map(record => record.news);
+        return session;
     }
     add(maxAge?: number): Promise<Session>;
     add(user: User, maxAge?: number): Promise<Session>;
@@ -47,13 +51,11 @@ class SessionManager {
             session.user = user;
         }
         session.lastAccessDate = new Date();
-        return this.connection.manager.save(Session, session).then(session => {
-            return session;
-        });
+        return this.connection.manager.save(session);
     }
     async update(session: Session): Promise<boolean> {
         if (await this.has(session.id)) {
-            this.connection.manager.save(Session, session);
+            this.connection.manager.save(session);
             return true;
         }
         else

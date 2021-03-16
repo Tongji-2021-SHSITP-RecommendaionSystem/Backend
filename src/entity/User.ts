@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, OneToOne } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, OneToOne, OneToMany } from "typeorm";
+import BrowsingHistory from "./BrowsingHistory";
 import News from "./News";
 import Session from "./Session";
 
@@ -22,9 +23,16 @@ export default class User {
     })
     readonly session?: Session;
 
-    @ManyToMany(type => News, news => news.readers, {
+    @OneToMany(type => BrowsingHistory, record => record.user, {
+        cascade: true,
         eager: true
     })
-    @JoinTable({ name: "user-view-news" })
-    viewed?: News[];
+    newsRecords: BrowsingHistory[];
+
+    viewed: News[];
+
+    constructor(id?: number) {
+        if (id)
+            this.id = id;
+    }
 }

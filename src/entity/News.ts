@@ -1,5 +1,6 @@
 import Cheerio = require("cheerio");
-import { Column, Entity, ManyToMany, PrimaryGeneratedColumn } from "typeorm"
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm"
+import BrowsingHistory from "./BrowsingHistory";
 import User from "./User";
 
 @Entity()
@@ -25,12 +26,20 @@ export default class News {
 	@Column({ type: "text", nullable: true })
 	image?: string;
 
-	@ManyToMany(type => User, user => user.viewed, {
-		persistence: false
+	@OneToMany(type => BrowsingHistory, record => record.news, {
+		persistence: false,
+		eager: true
 	})
-	readers?: User[];
+	readerRecords: BrowsingHistory[];
+
+	readers: User[];
 
 	get content(): string {
 		return Cheerio.load(this.article)("*").text();
+	}
+
+	constructor(id?: number) {
+		if (id)
+			this.id = id;
 	}
 }

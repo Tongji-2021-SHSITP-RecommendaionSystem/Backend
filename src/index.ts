@@ -16,6 +16,7 @@ import { validateParameter, validatePayload } from "./validation";
 import { API, pattern } from "./api"
 import { In } from "typeorm";
 import { ParamsDictionary } from "express-serve-static-core"
+import BrowsingHistory, { TimeRecord } from "./entity/BrowsingHistory";
 
 interface ResponseLocal {
 	session?: Session;
@@ -167,7 +168,7 @@ Database.create().then(database => {
 		(request: Request<API.News.GetNews.Request>, response: Response<API.News.GetNews.Response>) => {
 			if (!validateParameter(request, response, ["id", pattern.number]))
 				return;
-			const id = Number.parseInt((request.query as object as API.News.GetNews.Request).id);
+			const id = Number.parseInt(request.query.id);
 			database.findById(News, id).then(
 				news => {
 					if (news != null && news != undefined)
@@ -267,10 +268,7 @@ Database.create().then(database => {
 				response.status(403).send("Wrong verification code");
 			else {
 				const newUser = new User();
-				const payload = request.body as object as API.User.Register.Request;
-				newUser.username = payload.username;
-				newUser.password = payload.password;
-				newUser.email = payload.email;
+				Object.innerAssign(newUser, request.body);
 				database
 					.getTable(User)
 					.save(newUser)
@@ -295,11 +293,20 @@ Database.create().then(database => {
 				["endTime", pattern.number]
 			)) return;
 			const user = response.locals.session.user;
-			const news = new News();
-			news.id = Number.parseInt((request.query as object as API.User.ReadNews.Request).id);
-			if (!user.viewed?.length)
-				user.viewed = new Array<News>();
-			user.viewed.push(news);
+			const timeRecord: TimeRecord = {
+				start: new Date(request.query.startTime),
+				end: new Date(request.query.endTime)
+			}
+			const newsId = Number.parseInt(request.query.id);
+			let record = user.newsRecords?.find(record => record.news.id == newsId);
+			if (record)
+				record.timeRecord.push(timeRecord)
+			else {
+				record = new BrowsingHistory(user.id, newsId, [timeRecord]);
+				if (Object.isEmpty(user.newsRecords))
+					user.newsRecords = new Array();
+				user.newsRecords.push(record);
+			}
 			database.save(user).then(
 				_ => response.sendStatus(200),
 				_ => response.sendStatus(500)
