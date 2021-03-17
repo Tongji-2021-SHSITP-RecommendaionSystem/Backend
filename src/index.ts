@@ -1,22 +1,22 @@
 import "basic-type-extensions";
 import express = require("express");
-import cookieParser = require("cookie-parser");
 import bodyParser = require("body-parser");
+import cookieParser = require("cookie-parser");
 import Mailer = require("nodemailer");
 import FileSystem = require("fs");
 import Mail = require("nodemailer/lib/mailer");
-import Database from "./database";
-import ModelTaskAllocator from "./recommendation/allocator"
 import User from "./entity/User";
-import Session from "./entity/Session";
 import News from "./entity/News";
-import settings, { smtpConfig } from "./config"
-import { parse as parseHtml } from "node-html-parser";
-import { validateParameter, validatePayload } from "./validation";
-import { API, pattern } from "./api"
-import { In } from "typeorm";
-import { ParamsDictionary } from "express-serve-static-core"
+import Session from "./entity/Session";
+import Database from "./database";
+import ModelTaskAllocator from "./recommendation/allocator";
+import settings, { smtpConfig } from "./config";
 import BrowsingHistory, { TimeRecord } from "./entity/BrowsingHistory";
+import { In } from "typeorm";
+import { API, pattern } from "./api";
+import { parse as parseHtml } from "node-html-parser";
+import { ParamsDictionary } from "express-serve-static-core";
+import { validateParameter, validatePayload } from "./validation";
 
 interface ResponseLocal {
 	session?: Session;
@@ -129,7 +129,7 @@ Database.create().then(database => {
 		}
 	);
 
-	const scheduler = new ModelTaskAllocator();
+	const allocator = new ModelTaskAllocator();
 	app.get(
 		"/api/news/recommend",
 		(request: Request<API.News.Recommend.Request>, response: Response<API.News.Recommend.Response>) => {
@@ -138,13 +138,13 @@ Database.create().then(database => {
 			const count = Number.parseInt(request.query.count ?? "10");
 			const user = response.locals.session.user;
 			if (!user.viewed?.length) {
-				database.getTable(News).find({
-					take: count,
-					select: ["id"]
-				}).then(
-					newses => response.json({ ids: newses.map(news => news.id) }),
-					handleInternalError(response)
-				)
+				database.getTable(News)
+					.createQueryBuilder("news")
+					.select("news.id").take(count).orderBy("RAND()")
+					.getMany().then(
+						newses => response.json({ ids: newses.map(news => news.id) }),
+						handleInternalError(response)
+					);
 			}
 			else {
 				database.getTable(News)
@@ -152,10 +152,15 @@ Database.create().then(database => {
 					.where(`news.id NOT IN (${user.viewed.map(news => news.id).toString()})`)
 					.orderBy("RAND()").take(count * 5).getMany().then(
 						newses => {
-							scheduler.recommend(user.viewed, newses).then(
-								result => response.send({ ids: result.slice(0, count).map(value => value[0].id) }),
+							const start = Date.now();
+							allocator.recommend(user.viewed, newses).then(
+								result => {
+									console.log(`Recommendation time cost: `, Date.now() - start, " ms");
+									console.log(result.slice(0, count).map(value => value[1]));
+									response.send({ ids: result.slice(0, count).map(value => value[0].id) });
+								},
 								handleInternalError(response)
-							)
+							);
 						},
 						handleInternalError(response)
 					)
@@ -294,16 +299,19 @@ Database.create().then(database => {
 			)) return;
 			const user = response.locals.session.user;
 			const timeRecord: TimeRecord = {
-				start: new Date(request.query.startTime),
-				end: new Date(request.query.endTime)
+				start: Number.parseInt(request.query.startTime),
+				end: Number.parseInt(request.query.endTime)
 			}
 			const newsId = Number.parseInt(request.query.id);
 			let record = user.newsRecords?.find(record => record.news.id == newsId);
-			if (record)
-				record.timeRecord.push(timeRecord)
+			if (record) {
+				const records = record.timeRecord;
+				records.push(timeRecord);
+				record.timeRecord = records;
+			}
 			else {
 				record = new BrowsingHistory(user.id, newsId, [timeRecord]);
-				if (Object.isEmpty(user.newsRecords))
+				if (Object.isNullOrUndefined(user.newsRecords))
 					user.newsRecords = new Array();
 				user.newsRecords.push(record);
 			}

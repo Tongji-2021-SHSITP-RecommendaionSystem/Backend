@@ -3,7 +3,7 @@ import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import News from "./News";
 import User from "./User";
 
-export type TimeRecord = Record<"start" | "end", Date>;
+export type TimeRecord = Record<"start" | "end", number>;
 
 @Entity("browsing-history")
 export default class BrowsingHistory {
@@ -17,12 +17,11 @@ export default class BrowsingHistory {
 	@ManyToOne(type => News, news => news.readerRecords, {
 		primary: true,
 		persistence: false,
-		eager: true
 	})
 	@JoinColumn({ name: "newsId" })
 	news: News;
 
-	@Column("text")
+	@Column({ type: "text", name: "timeRecord" })
 	_timeRecord: string;
 
 	get timeRecord(): TimeRecord[] {

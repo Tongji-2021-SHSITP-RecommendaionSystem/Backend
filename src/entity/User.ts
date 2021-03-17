@@ -24,8 +24,7 @@ export default class User {
     readonly session?: Session;
 
     @OneToMany(type => BrowsingHistory, record => record.user, {
-        cascade: true,
-        eager: true
+        cascade: true
     })
     newsRecords: BrowsingHistory[];
 

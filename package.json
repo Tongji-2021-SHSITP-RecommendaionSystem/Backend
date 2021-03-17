@@ -34,6 +34,7 @@
 	"scripts": {
 		"start": "ts-node src/index.ts",
 		"test": "ts-node src/test/test.ts",
+		"try": "ts-node src/test/try.ts",
 		"train": "py -3.7 src/recommendation/train.py",
 		"crawl": "ts-node src/test/crawl.ts"
 	}

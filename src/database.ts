@@ -4,6 +4,7 @@ import { Connection, createConnection, EntityTarget, FindConditions, Repository,
 import User from "./entity/User";
 import Session from "./entity/Session";
 import settings from "./config";
+import BrowsingHistory from "./entity/BrowsingHistory";
 
 class SessionManager {
     readonly length: number;
@@ -27,8 +28,16 @@ class SessionManager {
     }
     async get(sessionId: string): Promise<Session> {
         const session = await this.connection.manager.findOne(Session, sessionId, { relations: ["user"] });
-        if (!Object.isNullOrUndefined(session.user))
-            session.user.viewed = session.user.newsRecords.map(record => record.news);
+        if (!Object.isNullOrUndefined(session?.user)) {
+            session.user.newsRecords = await this.connection.getRepository(BrowsingHistory).find({
+                where: {
+                    user: session.user
+                },
+                relations: ["news"]
+            });
+            if (session.user.newsRecords)
+                session.user.viewed = session.user.newsRecords.map(record => record.news);
+        }
         return session;
     }
     add(maxAge?: number): Promise<Session>;

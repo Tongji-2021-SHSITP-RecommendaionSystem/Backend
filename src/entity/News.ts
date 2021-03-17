@@ -27,8 +27,7 @@ export default class News {
 	image?: string;
 
 	@OneToMany(type => BrowsingHistory, record => record.news, {
-		persistence: false,
-		eager: true
+		persistence: false
 	})
 	readerRecords: BrowsingHistory[];
 
