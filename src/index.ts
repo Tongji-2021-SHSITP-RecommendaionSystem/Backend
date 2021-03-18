@@ -156,7 +156,6 @@ Database.create().then(database => {
 							allocator.recommend(user.viewed, newses).then(
 								result => {
 									console.log(`Recommendation time cost: `, Date.now() - start, " ms");
-									console.log(result.slice(0, count).map(value => value[1]));
 									response.send({ ids: result.slice(0, count).map(value => value[0].id) });
 								},
 								handleInternalError(response)

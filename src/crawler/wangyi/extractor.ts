@@ -18,6 +18,10 @@ export default class WangYiExtractor {
 			const infos = infoText.split(/来源[:：]/);
 			news.date = new Date(infos[0].trimRight());
 			news.source = infos[1].trimLeft();
+			$("div.post_body>p").each((_, element) => {
+				const html = $(element).html();
+				$(element).html(html.trim());
+			})
 			news.article = $("div.post_body").html();
 			return news;
 		}
