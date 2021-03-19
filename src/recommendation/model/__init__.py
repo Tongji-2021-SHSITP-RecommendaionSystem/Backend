@@ -4,7 +4,6 @@ Created on Wed Oct 21 15:41:09 2020
 
 @author: 1952640
 """
-import sys
 from model.attention import MultiHeadSelfAttention
 from model.attention import AdditiveAttention
 from typing import *

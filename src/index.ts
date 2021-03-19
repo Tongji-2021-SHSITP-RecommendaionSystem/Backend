@@ -271,7 +271,9 @@ Database.create().then(database => {
 				response.status(403).send("Wrong verification code");
 			else {
 				const newUser = new User();
-				Object.innerAssign(newUser, request.body);
+				newUser.email = request.body.email;
+				newUser.username = request.body.username;
+				newUser.password = request.body.password;
 				database
 					.getTable(User)
 					.save(newUser)

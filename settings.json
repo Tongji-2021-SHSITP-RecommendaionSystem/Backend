@@ -1,7 +1,7 @@
 {
 	"session": {
 		"maxAge": 1800000,
-		"emailInterval": 60000
+		"emailInterval": 600000
 	},
 	"model": {
 		"pythonPath": "D:/Program Files/Python/3.7.9/python.exe",
