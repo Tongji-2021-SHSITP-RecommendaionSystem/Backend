@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, OneToOne, OneToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, OneToMany, CreateDateColumn } from "typeorm";
 import BrowsingHistory from "./BrowsingHistory";
 import News from "./News";
 import Session from "./Session";
@@ -16,6 +16,9 @@ export default class User {
 
     @Column({ length: 64, unique: true })
     email: string;
+
+    @CreateDateColumn()
+    joinDate: Date;
 
     @OneToOne(type => Session, session => session.user, {
         eager: true,
