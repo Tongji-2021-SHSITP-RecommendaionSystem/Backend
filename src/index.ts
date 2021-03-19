@@ -113,8 +113,14 @@ Database.create().then(database => {
 				async user => {
 					if (!user)
 						response.status(401).send("Email not registered");
-					else if (user.session)
-						response.status(400).send("User already logged in");
+					else if (user.session) {
+						response.cookie(
+							"sessionId",
+							user.session.id,
+							{ maxAge: user.session.maxAge + user.session.lastAccessDate.getDate() - Date.now() }
+						);
+						response.send("User already logged in");
+					}
 					else if (user.password != request.query.password)
 						response.status(401).send("Wrong password");
 					else {
