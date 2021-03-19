@@ -4,6 +4,7 @@ import SMTPTransport = require("nodemailer/lib/smtp-transport");
 export interface Settings {
 	session: {
 		maxAge: number;
+		emailInterval: number;
 	};
 	model: {
 		pythonPath: string;

@@ -208,8 +208,8 @@ Database.create().then(database => {
 			if (!validateParameter(request, response, ["email", pattern.email, [1, 64]]))
 				return;
 			const metadata = response.locals.session.metadata ? JSON.parse(response.locals.session.metadata) : {};
-			if (metadata.mailTime && Date.now() < metadata.mailTime + 60000)
-				response.status(429).json({ timeLeft: 60000 + metadata.mailTime - Date.now() });
+			if (metadata.mailTime && Date.now() < metadata.mailTime + settings.session.emailInterval)
+				response.status(429).json({ timeLeft: settings.session.emailInterval + metadata.mailTime - Date.now() });
 			else {
 				if (await database.findOneByConditions(User, { email: request.query.email }))
 					return response.status(403).send("Email address already registered");
@@ -220,7 +220,6 @@ Database.create().then(database => {
 					for (let i = 0; i < 4; ++i)
 						code += charset.charAt(Math.floor(Math.random() * charset.length));
 				} while (code.length != 4);
-				emailTemplate.querySelector("#target").set_content(request.query.email);
 				emailTemplate.querySelector("#code").set_content(code);
 				const transporter = Mailer.createTransport(smtpConfig);
 				const mailOptions: Mail.Options = {
@@ -257,7 +256,7 @@ Database.create().then(database => {
 				["code", String, /^[a-z0-9]{4}$/i]
 			)) return;
 			const metadata = response.locals.session.metadata ? JSON.parse(response.locals.session.metadata) : {};
-			if (metadata.mailTime && Date.now() > metadata.mailTime + 60000) {
+			if (metadata.mailTime && Date.now() > metadata.mailTime + settings.session.emailInterval) {
 				delete metadata.code;
 				delete metadata.mailTime;
 				response.locals.session.metadata = JSON.stringify(metadata);
