@@ -76,10 +76,12 @@ Database.create().then(database => {
 						response.status(401).send("Session doesn't exist");
 				}
 				else {
-					session.lastAccessDate = new Date();
-					database.sessions.update(session);
 					response.locals.session = session;
-					response.cookie("sessionId", sessionId, { maxAge: settings.session.maxAge });
+					if (session.user) {
+						session.lastAccessDate = new Date();
+						database.sessions.update(session);
+						response.cookie("sessionId", sessionId, { maxAge: settings.session.maxAge });
+					}
 					next();
 				}
 			});
@@ -117,9 +119,9 @@ Database.create().then(database => {
 						response.cookie(
 							"sessionId",
 							user.session.id,
-							{ maxAge: user.session.maxAge + user.session.lastAccessDate.getDate() - Date.now() }
+							{ maxAge: user.session.maxAge + (+user.session.lastAccessDate) - Date.now() }
 						);
-						response.send("User already logged in");
+						response.status(200).send("User already logged in");
 					}
 					else if (user.password != request.query.password)
 						response.status(401).send("Wrong password");

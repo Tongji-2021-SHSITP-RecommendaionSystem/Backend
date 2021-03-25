@@ -1,3 +1,4 @@
+import "basic-type-extensions";
 import { PythonShell } from "python-shell";
 import settings from "../config";
 import News from "../entity/News";
@@ -25,12 +26,10 @@ export default class Recommender {
 				candidates: candidates.map(news => ({ title: news.title, content: news.content } as SimpleNews))
 			});
 			this.shell.send(`run ${body}`);
-			new Promise<void>(resolve => {
-				setInterval(() => {
-					if (this.available)
-						resolve();
-				}, settings.model.timerInterval);
-			}).then(() => {
+			Promise.wait(
+				() => this.available,
+				settings.model.timerInterval
+			).then(() => {
 				this.available = false;
 				resolve(this.curResult)
 			});
