@@ -141,11 +141,14 @@ Database.create().then(database => {
 	app.get(
 		"/api/news/recommend",
 		(request: Request<API.News.Recommend.Request>, response: Response<API.News.Recommend.Response>) => {
-			if (!validateParameter(request, response, ["count", true, pattern.number]))
-				return;
-			const count = Number.parseInt(request.query.count ?? "10");
+			if (!validateParameter(request, response,
+				["count", pattern.number],
+				["random", true, /^true|false$/]
+			)) return;
+			const count = Number.parseInt(request.query.count);
+			const random = request.query.random === "true";
 			const user = response.locals.session.user;
-			if (!user.viewed?.length) {
+			if (!user.viewed?.length || random) {
 				database.getTable(News)
 					.createQueryBuilder("news")
 					.select("news.id").take(count).orderBy("RAND()")
