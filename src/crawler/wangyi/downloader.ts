@@ -1,4 +1,4 @@
-import Crawler = require("crawler");
+import Crawler from "crawler";
 
 export default class WangYiDownloader {
 	public proxy?: string;

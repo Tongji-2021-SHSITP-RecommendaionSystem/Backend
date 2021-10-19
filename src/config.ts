@@ -1,5 +1,6 @@
-import FileSystem = require("fs");
-import SMTPTransport = require("nodemailer/lib/smtp-transport");
+import FileSystem from "fs";
+
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
 
 export interface Settings {
 	session: {

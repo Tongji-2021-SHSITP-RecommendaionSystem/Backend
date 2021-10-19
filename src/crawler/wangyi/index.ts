@@ -1,9 +1,9 @@
 import "basic-type-extensions";
-import ProgressBar = require("cli-progress")
-import WangYiFetcher from "./fetcher"
-import WangYiDownloader from "./downloader"
-import WangYiExtractor from "./extractor"
-import News from "../../entity/News";
+import ProgressBar from "cli-progress";
+import { News } from "news-recommendation-entity";
+import WangYiFetcher from "./fetcher";
+import WangYiDownloader from "./downloader";
+import WangYiExtractor from "./extractor";
 import { ApiNewsInfo } from "./interface";
 
 export default class WangYiCrawler {

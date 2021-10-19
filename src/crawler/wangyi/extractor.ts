@@ -1,5 +1,5 @@
-import Cheerio = require("cheerio")
-import News from "../../entity/News";
+import Cheerio from "cheerio";
+import { News } from "news-recommendation-entity";
 import { ApiNewsInfo } from "./interface";
 
 export default class WangYiExtractor {

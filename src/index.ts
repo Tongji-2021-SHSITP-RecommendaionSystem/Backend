@@ -1,20 +1,20 @@
 import "basic-type-extensions";
-import express = require("express");
-import bodyParser = require("body-parser");
-import cookieParser = require("cookie-parser");
-import Mailer = require("nodemailer");
-import FileSystem = require("fs");
-import Mail = require("nodemailer/lib/mailer");
-import { User, News, Session, BrowsingHistory } from "news-recommendation-entity";
-import Database from "./database";
-import { ModelTaskAllocator } from "news-recommendation-core";
-import settings, { smtpConfig } from "./config";
-import { TimeRecord } from "news-recommendation-entity/src/BrowsingHistory";
+import FileSystem from "fs";
+import express from "express";
+import cookieParser from "cookie-parser";
+import Mailer from "nodemailer";
 import { In } from "typeorm";
-import { API, pattern } from "./api";
 import { parse as parseHtml } from "node-html-parser";
 import { ParamsDictionary } from "express-serve-static-core";
+import { ModelTaskAllocator } from "news-recommendation-core";
+import { User, News, Session, BrowsingHistory } from "news-recommendation-entity";
+import { TimeRecord } from "news-recommendation-entity/src/BrowsingHistory";
+import settings, { smtpConfig } from "./config";
+import Database from "./database";
+import { API, pattern } from "./api";
 import { validateParameter, validatePayload } from "./validation";
+
+import type Mail from "nodemailer/lib/mailer";
 
 interface ResponseLocal {
 	session?: Session;
@@ -45,9 +45,7 @@ Database.create().then(database => {
 	const app: express.Application = express();
 	const port = 8081;
 	app.enable("trust proxy");
-	app.use(cookieParser(), bodyParser.json(), (_request, _response, next) =>
-		next()
-	);
+	app.use(cookieParser());
 	//API existence
 	app.use("/api", (request, response: Response, next) => {
 		if (!API.Accessibility.has("/api" + request.path))
