@@ -1,33 +1,40 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryColumn } from "typeorm"
+import {
+	Column,
+	CreateDateColumn,
+	Entity,
+	JoinColumn,
+	OneToOne,
+	PrimaryColumn,
+} from "typeorm";
 import User from "./User";
 
 @Entity()
 export default class Session {
-    @PrimaryColumn("char", { length: 16 })
-    id: string
+	@PrimaryColumn("char", { length: 16 })
+	id: string;
 
-    @OneToOne(type => User, user => user.session, {
-        persistence: false,
-    })
-    @JoinColumn()
-    user?: User
+	@OneToOne(type => User, user => user.session, {
+		persistence: false,
+	})
+	@JoinColumn()
+	user?: User;
 
-    @CreateDateColumn()
-    creationDate: Date
+	@CreateDateColumn()
+	creationDate: Date;
 
-    @Column()
-    lastAccessDate: Date
+	@Column()
+	lastAccessDate: Date;
 
-    @Column()
-    maxAge: number
+	@Column()
+	maxAge: number;
 
-    @Column({ type: "text", nullable: true })
-    metadata?: string
+	@Column({ type: "text", nullable: true })
+	metadata?: string;
 
-    expired(): boolean;
-    expired(time: Date): boolean;
-    expired(time?: Date): boolean {
-        let date = time ? time.getTime() : Date.now();
-        return date > this.lastAccessDate.getTime() + this.maxAge;
-    }
+	expired(): boolean;
+	expired(time: Date): boolean;
+	expired(time?: Date): boolean {
+		let date = time ? time.getTime() : Date.now();
+		return date > this.lastAccessDate.getTime() + this.maxAge;
+	}
 }

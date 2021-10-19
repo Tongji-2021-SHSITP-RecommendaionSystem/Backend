@@ -25,18 +25,17 @@ export default class BrowsingHistory {
 	_timeRecord: string;
 
 	get timeRecord(): TimeRecord[] {
-		return String.isNullOrEmpty(this._timeRecord) ? [] : JSON.parse(this._timeRecord);
+		return String.isNullOrEmpty(this._timeRecord)
+			? []
+			: JSON.parse(this._timeRecord);
 	}
 	set timeRecord(value: TimeRecord[]) {
 		this._timeRecord = value?.length ? JSON.stringify(value) : String.empty;
 	}
 
 	constructor(userId?: number, newsId?: number, timeRecord?: TimeRecord[]) {
-		if (userId)
-			this.user = new User(userId);
-		if (newsId)
-			this.news = new News(newsId);
-		if (timeRecord)
-			this.timeRecord = timeRecord;
+		if (userId) this.user = new User(userId);
+		if (newsId) this.news = new News(newsId);
+		if (timeRecord) this.timeRecord = timeRecord;
 	}
 }

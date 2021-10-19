@@ -11,15 +11,17 @@ export interface Settings {
 		timerInterval: number;
 		maxViewed: number;
 		candidatesPerBatch: number;
-	}
+	};
 }
-export type APIConfig = Map<string, [boolean]>
+export type APIConfig = Map<string, [boolean]>;
 
 export function loadFile<T = string>(path: string): T {
-	return JSON.parse(FileSystem.readFileSync(path).toString())
+	return JSON.parse(FileSystem.readFileSync(path).toString());
 }
 const settings = loadFile<Settings>("settings.json");
-export const apiConfig: APIConfig = new Map<string, [boolean]>(loadFile<Array<[string, [boolean]]>>("apiconfig.json"));
+export const apiConfig: APIConfig = new Map<string, [boolean]>(
+	loadFile<Array<[string, [boolean]]>>("apiconfig.json")
+);
 export const smtpConfig = loadFile<SMTPTransport.Options>("smtpconfig.json");
 
 export default settings;
