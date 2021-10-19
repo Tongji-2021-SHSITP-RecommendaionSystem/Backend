@@ -1,9 +1,7 @@
-import News from "./entity/News";
-import User from "./entity/User";
+import { News, User } from "news-recommendation-entity";
 import { apiConfig } from "./config";
 
 type RecordString<T extends string> = Record<T, string>;
-type Optionalize<T> = { [K in keyof T]?: T[K] };
 export namespace API {
 	export namespace User {
 		export namespace HasUser {

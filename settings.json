@@ -2,11 +2,5 @@
 	"session": {
 		"maxAge": 1800000,
 		"emailInterval": 600000
-	},
-	"model": {
-		"pythonPath": "D:/Program Files/Python/3.7.9/python.exe",
-		"timerInterval": 50,
-		"maxViewed": 20,
-		"candidatesPerBatch": 5
 	}
 }

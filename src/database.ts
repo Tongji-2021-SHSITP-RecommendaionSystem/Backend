@@ -8,10 +8,8 @@ import {
 	Repository,
 	SaveOptions,
 } from "typeorm";
-import User from "./entity/User";
-import Session from "./entity/Session";
-import settings from "./config";
-import BrowsingHistory from "./entity/BrowsingHistory";
+import { User, Session, BrowsingHistory } from "news-recommendation-entity";
+import Settings from "../settings.json"
 
 class SessionManager {
 	readonly length: number;
@@ -67,7 +65,7 @@ class SessionManager {
 				? param1
 				: param2 != undefined
 					? param2
-					: settings.session.maxAge;
+					: Settings.session.maxAge;
 		const user = param1 instanceof User ? param1 : null;
 		if (!user) {
 			do {
