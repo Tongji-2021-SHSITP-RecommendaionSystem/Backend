@@ -9,12 +9,15 @@ import { ParamsDictionary } from "express-serve-static-core";
 import { ModelTaskAllocator } from "news-recommendation-core";
 import { User, News, Session, BrowsingHistory } from "news-recommendation-entity";
 import { TimeRecord } from "news-recommendation-entity/src/BrowsingHistory";
-import settings, { smtpConfig } from "./config";
 import Database from "./database";
 import { API, pattern } from "./api";
 import { validateParameter, validatePayload } from "./validation";
+import { session as SessionSettings } from "../settings.json"
 
 import type Mail from "nodemailer/lib/mailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
+
+const SmtpConfig: SMTPTransport.Options = require("../settings.json").smtp;
 
 interface ResponseLocal {
 	session?: Session;
@@ -67,7 +70,7 @@ Database.create().then(database => {
 			const session = await database.sessions.add();
 			response.locals.session = session;
 			response.cookie("sessionId", session.id, {
-				maxAge: settings.session.maxAge,
+				maxAge: SessionSettings.maxAge,
 			});
 			return session;
 		}
@@ -92,7 +95,7 @@ Database.create().then(database => {
 						session.lastAccessDate = new Date();
 						database.sessions.update(session);
 						response.cookie("sessionId", sessionId, {
-							maxAge: settings.session.maxAge,
+							maxAge: SessionSettings.maxAge,
 						});
 					}
 					next();
@@ -304,13 +307,13 @@ Database.create().then(database => {
 				: {};
 			if (
 				metadata.mailTime &&
-				Date.now() < metadata.mailTime + settings.session.emailInterval
+				Date.now() < metadata.mailTime + SessionSettings.emailInterval
 			)
 				response
 					.status(429)
 					.json({
 						timeLeft:
-							settings.session.emailInterval +
+							SessionSettings.emailInterval +
 							metadata.mailTime -
 							Date.now(),
 					});
@@ -328,9 +331,9 @@ Database.create().then(database => {
 						);
 				} while (code.length != 4);
 				emailTemplate.querySelector("#code").set_content(code);
-				const transporter = Mailer.createTransport(smtpConfig);
+				const transporter = Mailer.createTransport(SmtpConfig);
 				const mailOptions: Mail.Options = {
-					from: smtpConfig.auth.user,
+					from: SmtpConfig.auth.user,
 					to: request.query.email,
 					subject: "闻所未闻验证邮件",
 					html: emailTemplate.toString(),
@@ -378,7 +381,7 @@ Database.create().then(database => {
 				: {};
 			if (
 				metadata.mailTime &&
-				Date.now() > metadata.mailTime + settings.session.emailInterval
+				Date.now() > metadata.mailTime + SessionSettings.emailInterval
 			) {
 				delete metadata.code;
 				delete metadata.mailTime;

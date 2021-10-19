@@ -1,5 +1,5 @@
 import { News, User } from "news-recommendation-entity";
-import { apiConfig } from "./config";
+const ApiConfig = new Map<string, [boolean]>(require("../settings.json").api);
 
 type RecordString<T extends string> = Record<T, string>;
 export namespace API {
@@ -40,10 +40,10 @@ export namespace API {
 	}
 	export class Accessibility {
 		public static has(path: string) {
-			return apiConfig.has(path);
+			return ApiConfig.has(path);
 		}
 		public static authorized(path: string, user?: User): boolean {
-			const target = apiConfig.get(path);
+			const target = ApiConfig.get(path);
 			return target[0] || user != undefined;
 		}
 	}

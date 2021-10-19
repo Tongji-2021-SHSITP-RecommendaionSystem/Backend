@@ -1,6 +1,5 @@
+node_modules
 /.vscode/
-/node_modules/
 /build/
 /src/test
 /ormconfig.json
-__pycache__

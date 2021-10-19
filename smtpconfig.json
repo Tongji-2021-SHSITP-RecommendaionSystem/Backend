@@ -1,9 +1,0 @@
-{
-	"host": "smtp.exmail.qq.com",
-	"port": 465,
-	"secure": true,
-	"auth": {
-		"user": "beyonews@truemogician.com",
-		"pass": "UwRoYc3Axrggf5kV"
-	}
-}

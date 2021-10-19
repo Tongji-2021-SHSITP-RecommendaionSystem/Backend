@@ -9,7 +9,7 @@ import {
 	SaveOptions,
 } from "typeorm";
 import { User, Session, BrowsingHistory } from "news-recommendation-entity";
-import Settings from "../settings.json"
+import { session as SessionSettings } from "../settings.json"
 
 class SessionManager {
 	readonly length: number;
@@ -65,7 +65,7 @@ class SessionManager {
 				? param1
 				: param2 != undefined
 					? param2
-					: Settings.session.maxAge;
+					: SessionSettings.maxAge;
 		const user = param1 instanceof User ? param1 : null;
 		if (!user) {
 			do {

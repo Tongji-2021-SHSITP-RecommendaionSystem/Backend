@@ -2,5 +2,25 @@
 	"session": {
 		"maxAge": 1800000,
 		"emailInterval": 600000
+	},
+	"api": [
+		["/api/user/hasUser", [true]],
+		["/api/user/login", [true]],
+		["/api/user/register", [true]],
+		["/api/user/sendEmail", [true]],
+		["/api/user/readNews", [false]],
+		["/api/user/logout", [false]],
+		["/api/news/getNews", [false]],
+		["/api/news/getNewsInfos", [false]],
+		["/api/news/recommend", [false]]
+	],
+	"smtp": {
+		"host": "smtp.exmail.qq.com",
+		"port": 465,
+		"secure": true,
+		"auth": {
+			"user": "beyonews@truemogician.com",
+			"pass": "UwRoYc3Axrggf5kV"
+		}
 	}
 }
