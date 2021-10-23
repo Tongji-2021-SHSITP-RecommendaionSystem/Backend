@@ -1,4 +1,5 @@
 {
+	"port": 8081,
 	"session": {
 		"maxAge": 1800000,
 		"emailInterval": 600000

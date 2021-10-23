@@ -12,7 +12,7 @@ import { TimeRecord } from "news-recommendation-entity/src/BrowsingHistory";
 import Database from "./database";
 import { API, pattern } from "./api";
 import { validateParameter, validatePayload } from "./validation";
-import { session as SessionSettings } from "../settings.json"
+import Settings from "../settings.json"
 
 import type Mail from "nodemailer/lib/mailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
@@ -46,7 +46,6 @@ function handleInternalError<
 }
 Database.create().then(database => {
 	const app: express.Application = express();
-	const port = 8081;
 	app.enable("trust proxy");
 	app.use(cookieParser());
 	//API existence
@@ -70,7 +69,7 @@ Database.create().then(database => {
 			const session = await database.sessions.add();
 			response.locals.session = session;
 			response.cookie("sessionId", session.id, {
-				maxAge: SessionSettings.maxAge,
+				maxAge: Settings.session.maxAge,
 			});
 			return session;
 		}
@@ -95,7 +94,7 @@ Database.create().then(database => {
 						session.lastAccessDate = new Date();
 						database.sessions.update(session);
 						response.cookie("sessionId", sessionId, {
-							maxAge: SessionSettings.maxAge,
+							maxAge: Settings.session.maxAge,
 						});
 					}
 					next();
@@ -338,13 +337,13 @@ Database.create().then(database => {
 				: {};
 			if (
 				metadata.mailTime &&
-				Date.now() < metadata.mailTime + SessionSettings.emailInterval
+				Date.now() < metadata.mailTime + Settings.session.emailInterval
 			)
 				response
 					.status(429)
 					.json({
 						timeLeft:
-							SessionSettings.emailInterval +
+							Settings.session.emailInterval +
 							metadata.mailTime -
 							Date.now(),
 					});
@@ -412,7 +411,7 @@ Database.create().then(database => {
 				: {};
 			if (
 				metadata.mailTime &&
-				Date.now() > metadata.mailTime + SessionSettings.emailInterval
+				Date.now() > metadata.mailTime + Settings.session.emailInterval
 			) {
 				delete metadata.code;
 				delete metadata.mailTime;
@@ -493,7 +492,7 @@ Database.create().then(database => {
 		response.sendStatus(200);
 	});
 
-	app.listen(port, () => console.log(`App listening on ${port}`));
+	app.listen(Settings.port, () => console.log(`App listening on ${Settings.port}`));
 
 	const sessionCleaner = setInterval(() => {
 		database
