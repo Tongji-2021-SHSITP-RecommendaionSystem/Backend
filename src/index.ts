@@ -46,16 +46,12 @@ function handleInternalError<
 }
 Database.create().then(database => {
 	const app: express.Application = express();
+	const runner = new Runner();
+	const emailTemplate = parseHtml(FileSystem.readFileSync("email.html").toString());
 	app.enable("trust proxy");
+	//#region Global Middlewares
 	app.use(cookieParser());
-	//API existence
-	app.use("/api", (request, response: Response, next) => {
-		if (!API.Accessibility.has("/api" + request.path))
-			response.status(400).send("API not supported");
-		else
-			next();
-	});
-	//Session
+	// Handle Session
 	app.use("/api", async (request, response: Response, next) => {
 		console.log({
 			time: new Date().toLocaleTimeString(),
@@ -84,9 +80,7 @@ Database.create().then(database => {
 				}
 				if (!session) {
 					await createSession();
-					API.Accessibility.authorized("/api" + request.path)
-						? next()
-						: response.status(401).send("Session doesn't exist");
+					next();
 				}
 				else {
 					response.locals.session = session;
@@ -102,20 +96,71 @@ Database.create().then(database => {
 			});
 		}
 	});
-	//API authentification
-	app.use("/api", (request, response: Response, next) => {
-		const result = API.Accessibility.authorized(
-			"/api" + request.path,
-			response.locals.session.user
-		);
-		result === true ? next() : response.sendStatus(401);
-	});
+	//#endregion
+
+	//#region User
+	app.post(
+		"/api/user",
+		(
+			request: Request<null, API.User.Post["request"]>,
+			response: Response<API.User.Post["response"]>
+		) => {
+			if (
+				!validatePayload(
+					request,
+					response,
+					["username", String, pattern.username, [1, 32]],
+					["password", String, [1, 32]],
+					["email", String, pattern.email, [1, 64]],
+					["code", String, /^[a-z0-9]{4}$/i]
+				)
+			)
+				return;
+			const metadata = response.locals.session.metadata
+				? JSON.parse(response.locals.session.metadata)
+				: {};
+			if (
+				metadata.mailTime &&
+				Date.now() > metadata.mailTime + Settings.session.emailInterval
+			) {
+				delete metadata.code;
+				delete metadata.mailTime;
+				response.locals.session.metadata = JSON.stringify(metadata);
+				database.sessions.update(response.locals.session);
+				response.status(403).send("Verification code expired");
+			}
+			else if (response.locals.session.user)
+				response.status(400).send("User already logged in");
+			else if (!metadata.code)
+				response.status(400).send("Verification email not sent");
+			else if (metadata.code != request.body.code)
+				response.status(403).send("Wrong verification code");
+			else {
+				const newUser = new User();
+				newUser.email = request.body.email;
+				newUser.username = request.body.username;
+				newUser.password = request.body.password;
+				database
+					.getTable(User)
+					.save(newUser)
+					.then(user => {
+						delete metadata.code;
+						delete metadata.mailTime;
+						response.locals.session.user = user;
+						response.locals.session.metadata =
+							JSON.stringify(metadata);
+						database.sessions.update(response.locals.session);
+						response.status(201).json({ id: user.id });
+					});
+			}
+		}
+	);
 
 	app.get(
-		"/api/user/hasUser",
+		"/api/user/email",
 		(
-			request: Request<API.User.HasUser.Request>,
-			response: Response<API.User.HasUser.Response>
+			request: Request<API.User.Email.Get["request"]>,
+			response: Response<API.User.Email.Get["response"]>
 		) => {
 			if (
 				!validateParameter(request, response, [
@@ -137,11 +182,11 @@ Database.create().then(database => {
 		}
 	);
 
-	app.get(
+	app.post(
 		"/api/user/login",
-		(request: Request<API.User.Login.Request>, response: Response) => {
+		(request: Request<API.User.Login.Post["request"]>, response: Response) => {
 			if (
-				!validateParameter(
+				!validatePayload(
 					request,
 					response,
 					["email", pattern.email, [1, 64]],
@@ -179,149 +224,20 @@ Database.create().then(database => {
 		}
 	);
 
-	const runner = new Runner();
-	app.get(
-		"/api/news/recommend",
-		(
-			request: Request<API.News.Recommend.Request>,
-			response: Response<API.News.Recommend.Response>
-		) => {
-			if (
-				!validateParameter(
-					request,
-					response,
-					["count", pattern.number],
-					["random", true, /^true|false$/]
-				)
-			)
-				return;
-			const count = Number.parseInt(request.query.count);
-			const random = request.query.random === "true";
-			const user = response.locals.session.user;
-			if (!user.viewed?.length || random) {
-				database
-					.getTable(News)
-					.createQueryBuilder("news")
-					.select("news.id")
-					.take(count)
-					.orderBy("RAND()")
-					.getMany()
-					.then(
-						newses =>
-							response.json({ ids: newses.map(news => news.id) }),
-						handleInternalError(response)
-					);
-			}
-			else {
-				database
-					.getTable(News)
-					.createQueryBuilder("news")
-					.where(
-						`news.id NOT IN (${user.viewed
-							.map(news => news.id)
-							.toString()})`
-					)
-					.orderBy("RAND()")
-					.take(count * 5)
-					.getMany()
-					.then(newses => {
-						const start = Date.now();
-						runner
-							.recommend(user.viewed, newses)
-							.then(result => {
-								console.log(
-									`Recommendation time cost: `,
-									Date.now() - start,
-									" ms"
-								);
-								response.send({
-									ids: result
-										.slice(0, count)
-										.map(value => value[0].id),
-								});
-							}, handleInternalError(response));
-					}, handleInternalError(response));
-			}
+	app.delete("/api/user/login", (request: Request, response: Response) => {
+		if (!response.locals.session?.user) {
+			response.status(401);
+			return;
 		}
-	);
+		response.clearCookie("sessionId");
+		database.sessions.delete(response.locals.session!.id);
+		response.sendStatus(200);
+	});
 
-	app.get(
-		"/api/news/meta",
-		(
-			request: Request<API.News.GetNewsMeta.Request>,
-			response: Response<API.News.GetNewsMeta.Response>
-		) => {
-			if (
-				!validateParameter(
-					request,
-					response,
-					["id", pattern.number]
-				)
-			)
-				return;
-			const id = Number.parseInt(request.query.id);
-			database.findById(News, id).then(
-				async news => {
-					if (news != null && news != undefined) {
-						const content = news.content;
-						response.status(200).json({
-							keywords: await runner.keywords(content, 5),
-							summary: await runner.summary(content, 5),
-							sentiment: await runner.sentiment(content)
-						});
-					}
-					else
-						response.status(404).send("News not found");
-				},
-				handleInternalError(response)
-			)
-		}
-	)
-
-	app.get(
-		"/api/news/getNews",
-		(
-			request: Request<API.News.GetNews.Request>,
-			response: Response<API.News.GetNews.Response>
-		) => {
-			if (!validateParameter(request, response, ["id", pattern.number]))
-				return;
-			const id = Number.parseInt(request.query.id);
-			database.findById(News, id).then(news => {
-				if (news != null && news != undefined)
-					response.status(200).json(news);
-				else
-					response.status(404).send("News not found");
-			}, handleInternalError(response));
-		}
-	);
-
-	app.get(
-		"/api/news/getNewsInfos",
-		(
-			request: Request<API.News.GetNewsInfos.Request>,
-			response: Response<API.News.GetNewsInfos.Response>
-		) => {
-			if (!validateParameter(request, response, ["ids", Array])) return;
-			const ids = request.query.ids.map(id => Number.parseInt(id));
-			database
-				.getTable(News)
-				.find({
-					where: { id: In(ids) },
-					select: ["id", "title", "url", "image", "date", "source"],
-				})
-				.then(
-					newses => response.json({ infos: newses }),
-					handleInternalError(response)
-				);
-		}
-	);
-
-	const emailTemplate = parseHtml(FileSystem.readFileSync("email.html").toString());
 	app.post(
-		"/api/user/sendEmail",
+		"/api/user/validation",
 		async (
-			request: Request<API.User.SendEmail.Request>,
+			request: Request<API.User.Validation.Post["request"]>,
 			response: Response<{ timeLeft: number }>
 		) => {
 			if (
@@ -390,65 +306,8 @@ Database.create().then(database => {
 	);
 
 	app.post(
-		"/api/user/register",
-		(
-			request: Request<null, API.User.Register.Request>,
-			response: Response<API.User.Register.Response>
-		) => {
-			if (
-				!validatePayload(
-					request,
-					response,
-					["username", String, pattern.username, [1, 32]],
-					["password", String, [1, 32]],
-					["email", String, pattern.email, [1, 64]],
-					["code", String, /^[a-z0-9]{4}$/i]
-				)
-			)
-				return;
-			const metadata = response.locals.session.metadata
-				? JSON.parse(response.locals.session.metadata)
-				: {};
-			if (
-				metadata.mailTime &&
-				Date.now() > metadata.mailTime + Settings.session.emailInterval
-			) {
-				delete metadata.code;
-				delete metadata.mailTime;
-				response.locals.session.metadata = JSON.stringify(metadata);
-				database.sessions.update(response.locals.session);
-				response.status(403).send("Verification code expired");
-			}
-			else if (response.locals.session.user)
-				response.status(400).send("User already logged in");
-			else if (!metadata.code)
-				response.status(400).send("Verification email not sent");
-			else if (metadata.code != request.body.code)
-				response.status(403).send("Wrong verification code");
-			else {
-				const newUser = new User();
-				newUser.email = request.body.email;
-				newUser.username = request.body.username;
-				newUser.password = request.body.password;
-				database
-					.getTable(User)
-					.save(newUser)
-					.then(user => {
-						delete metadata.code;
-						delete metadata.mailTime;
-						response.locals.session.user = user;
-						response.locals.session.metadata =
-							JSON.stringify(metadata);
-						database.sessions.update(response.locals.session);
-						response.status(201).json({ id: user.id });
-					});
-			}
-		}
-	);
-
-	app.post(
-		"/api/user/readNews",
-		(request: Request<API.User.ReadNews.Request>, response: Response) => {
+		"/api/user/history",
+		(request: Request<API.User.History.Post["request"]>, response: Response) => {
 			if (
 				!validateParameter(
 					request,
@@ -460,6 +319,10 @@ Database.create().then(database => {
 			)
 				return;
 			const user = response.locals.session.user;
+			if (user.id != Number(request.query.id)) {
+				response.status(401);
+				return;
+			}
 			const timeRecord: TimeRecord = {
 				start: Number.parseInt(request.query.startTime),
 				end: Number.parseInt(request.query.endTime),
@@ -485,12 +348,153 @@ Database.create().then(database => {
 			);
 		}
 	);
+	//#endregion
 
-	app.post("/api/user/logout", (request: Request, response: Response) => {
-		response.clearCookie("sessionId");
-		database.sessions.delete(response.locals.session!.id);
-		response.sendStatus(200);
+	//#region News
+	app.use("/api/news", (request: Request, response: Response, next) => {
+		if (!response.locals.session?.user)
+			response.status(401);
+		else
+			next();
 	});
+
+	app.get(
+		"/api/news",
+		(
+			request: Request<API.News.Get["request"]>,
+			response: Response<API.News.Get["response"]>
+		) => {
+			if (!validateParameter(request, response, ["id", pattern.number]))
+				return;
+			const id = Number.parseInt(request.query.id);
+			database.findById(News, id).then(news => {
+				if (news != null && news != undefined)
+					response.status(200).json(news);
+				else
+					response.status(404).send("News not found");
+			}, handleInternalError(response));
+		}
+	);
+
+	app.get(
+		"/api/news/recommendation",
+		(
+			request: Request<API.News.Recommendation.Get["request"]>,
+			response: Response<API.News.Recommendation.Get["response"]>
+		) => {
+			if (
+				!validateParameter(
+					request,
+					response,
+					["count", pattern.number],
+					["random", true, /^true|false$/]
+				)
+			)
+				return;
+			const count = Number.parseInt(request.query.count);
+			const random = request.query.random === "true";
+			const user = response.locals.session.user;
+			if (!user.viewed?.length || random) {
+				database
+					.getTable(News)
+					.createQueryBuilder("news")
+					.select("news.id")
+					.take(count)
+					.orderBy("RAND()")
+					.getMany()
+					.then(
+						newses =>
+							response.json({ ids: newses.map(news => news.id) }),
+						handleInternalError(response)
+					);
+			}
+			else {
+				database
+					.getTable(News)
+					.createQueryBuilder("news")
+					.where(
+						`news.id NOT IN (${user.viewed
+							.map(news => news.id)
+							.toString()})`
+					)
+					.orderBy("RAND()")
+					.take(count * 5)
+					.getMany()
+					.then(newses => {
+						const start = Date.now();
+						runner
+							.recommend(user.viewed, newses)
+							.then(result => {
+								console.log(
+									`Recommendation time cost: `,
+									Date.now() - start,
+									" ms"
+								);
+								response.send({
+									ids: result
+										.slice(0, count)
+										.map(value => value[0].id),
+								});
+							}, handleInternalError(response));
+					}, handleInternalError(response));
+			}
+		}
+	);
+
+	app.get(
+		"/api/news/analysis",
+		(
+			request: Request<API.News.Analysis.Get["request"]>,
+			response: Response<API.News.Analysis.Get["response"]>
+		) => {
+			if (
+				!validateParameter(
+					request,
+					response,
+					["id", pattern.number]
+				)
+			)
+				return;
+			const id = Number.parseInt(request.query.id);
+			database.findById(News, id).then(
+				async news => {
+					if (news != null && news != undefined) {
+						const content = news.content;
+						response.status(200).json({
+							keywords: await runner.keywords(content, 5),
+							summary: await runner.summary(content, 5),
+							sentiment: await runner.sentiment(content)
+						});
+					}
+					else
+						response.status(404).send("News not found");
+				},
+				handleInternalError(response)
+			)
+		}
+	)
+
+	app.get(
+		"/api/news/infos",
+		(
+			request: Request<API.News.Infos.Get["request"]>,
+			response: Response<API.News.Infos.Get["response"]>
+		) => {
+			if (!validateParameter(request, response, ["ids", Array])) return;
+			const ids = request.query.ids.map(id => Number.parseInt(id));
+			database
+				.getTable(News)
+				.find({
+					where: { id: In(ids) },
+					select: ["id", "title", "url", "image", "date", "source"],
+				})
+				.then(
+					newses => response.json({ infos: newses }),
+					handleInternalError(response)
+				);
+		}
+	);
+	//#endregion
 
 	app.listen(Settings.port, () => console.log(`App listening on ${Settings.port}`));
 
