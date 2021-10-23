@@ -6,7 +6,7 @@ import Mailer from "nodemailer";
 import { In } from "typeorm";
 import { parse as parseHtml } from "node-html-parser";
 import { ParamsDictionary } from "express-serve-static-core";
-import { ModelTaskAllocator } from "news-recommendation-core";
+import { Runner } from "news-recommendation-core";
 import { User, News, Session, BrowsingHistory } from "news-recommendation-entity";
 import { TimeRecord } from "news-recommendation-entity/src/BrowsingHistory";
 import Database from "./database";
@@ -180,7 +180,7 @@ Database.create().then(database => {
 		}
 	);
 
-	const allocator = new ModelTaskAllocator();
+	const runner = new Runner();
 	app.get(
 		"/api/news/recommend",
 		(
@@ -227,7 +227,7 @@ Database.create().then(database => {
 					.getMany()
 					.then(newses => {
 						const start = Date.now();
-						allocator
+						runner
 							.recommend(user.viewed, newses)
 							.then(result => {
 								console.log(
@@ -245,6 +245,39 @@ Database.create().then(database => {
 			}
 		}
 	);
+
+	app.get(
+		"/api/news/meta",
+		(
+			request: Request<API.News.GetNewsMeta.Request>,
+			response: Response<API.News.GetNewsMeta.Response>
+		) => {
+			if (
+				!validateParameter(
+					request,
+					response,
+					["id", pattern.number]
+				)
+			)
+				return;
+			const id = Number.parseInt(request.query.id);
+			database.findById(News, id).then(
+				async news => {
+					if (news != null && news != undefined) {
+						const content = news.content;
+						response.status(200).json({
+							keywords: await runner.keywords(content, 5),
+							summary: await runner.summary(content, 5),
+							sentiment: await runner.sentiment(content)
+						});
+					}
+					else
+						response.status(404).send("News not found");
+				},
+				handleInternalError(response)
+			)
+		}
+	)
 
 	app.get(
 		"/api/news/getNews",
@@ -285,9 +318,7 @@ Database.create().then(database => {
 		}
 	);
 
-	const emailTemplate = parseHtml(
-		FileSystem.readFileSync("email.html").toString()
-	);
+	const emailTemplate = parseHtml(FileSystem.readFileSync("email.html").toString());
 	app.post(
 		"/api/user/sendEmail",
 		async (

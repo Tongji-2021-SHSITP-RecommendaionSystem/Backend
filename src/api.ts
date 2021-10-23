@@ -33,6 +33,10 @@ export namespace API {
 			export type Request = Record<"ids", string[]>;
 			export type Response = Record<"infos", News[]>;
 		}
+		export namespace GetNewsMeta {
+			export type Request = RecordString<"id">;
+			export type Response = { keywords: string[], summary: string[], sentiment: number };
+		}
 		export namespace Recommend {
 			export type Request = { count: string; random?: string };
 			export type Response = Record<"ids", number[]>;
