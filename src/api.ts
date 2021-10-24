@@ -25,7 +25,7 @@ export namespace API {
 		}
 		export namespace History {
 			export type Post = {
-				request: RecordString<"id" | "startTime" | "endTime">;
+				request: Record<"id" | "startTime" | "endTime", number>;
 			}
 		}
 	}

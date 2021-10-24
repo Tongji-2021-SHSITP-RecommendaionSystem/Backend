@@ -45,12 +45,12 @@ function handleInternalError<
 	};
 }
 Database.create().then(database => {
-	const app: express.Application = express();
+	const app = express();
 	const runner = new Runner();
 	const emailTemplate = parseHtml(FileSystem.readFileSync("email.html").toString());
 	app.enable("trust proxy");
 	//#region Global Middlewares
-	app.use(cookieParser());
+	app.use(express.json() as any, cookieParser());
 	// Handle Session
 	app.use("/api", async (request, response: Response, next) => {
 		console.log({
@@ -105,16 +105,14 @@ Database.create().then(database => {
 			request: Request<null, API.User.Post["request"]>,
 			response: Response<API.User.Post["response"]>
 		) => {
-			if (
-				!validatePayload(
-					request,
-					response,
-					["username", String, pattern.username, [1, 32]],
-					["password", String, [1, 32]],
-					["email", String, pattern.email, [1, 64]],
-					["code", String, /^[a-z0-9]{4}$/i]
-				)
-			)
+			if (validatePayload(
+				request,
+				response,
+				["username", String, pattern.username, [1, 32]],
+				["password", String, [1, 32]],
+				["email", String, pattern.email, [1, 64]],
+				["code", String, /^[a-z0-9]{4}$/i]
+			) !== true)
 				return;
 			const metadata = response.locals.session.metadata
 				? JSON.parse(response.locals.session.metadata)
@@ -162,13 +160,11 @@ Database.create().then(database => {
 			request: Request<API.User.Email.Get["request"]>,
 			response: Response<API.User.Email.Get["response"]>
 		) => {
-			if (
-				!validateParameter(request, response, [
-					"email",
-					pattern.email,
-					[1, 64],
-				])
-			)
+			if (validateParameter(request, response, [
+				"email",
+				pattern.email,
+				[1, 64],
+			]) !== true)
 				return;
 			database
 				.findOneByConditions(User, { email: request.query.email })
@@ -184,18 +180,16 @@ Database.create().then(database => {
 
 	app.post(
 		"/api/user/login",
-		(request: Request<API.User.Login.Post["request"]>, response: Response) => {
-			if (
-				!validatePayload(
-					request,
-					response,
-					["email", pattern.email, [1, 64]],
-					["password", [1, 32]]
-				)
-			)
+		(request: Request<null, API.User.Login.Post["request"]>, response: Response) => {
+			if (validatePayload(
+				request,
+				response,
+				["email", pattern.email, [1, 64]],
+				["password", [1, 32]]
+			) !== true)
 				return;
 			database
-				.findOneByConditions(User, { email: request.query.email })
+				.findOneByConditions(User, { email: request.body.email })
 				.then(async user => {
 					if (!user)
 						response.status(401).send("Email not registered");
@@ -208,7 +202,7 @@ Database.create().then(database => {
 						});
 						response.status(200).send("User already logged in");
 					}
-					else if (user.password != request.query.password)
+					else if (user.password != request.body.password)
 						response.status(401).send("Wrong password");
 					else {
 						response.locals.session.user = user;
@@ -224,9 +218,9 @@ Database.create().then(database => {
 		}
 	);
 
-	app.delete("/api/user/login", (request: Request, response: Response) => {
+	app.delete("/api/user/login", (_: Request, response: Response) => {
 		if (!response.locals.session?.user) {
-			response.status(401);
+			response.status(401).end();
 			return;
 		}
 		response.clearCookie("sessionId");
@@ -240,13 +234,11 @@ Database.create().then(database => {
 			request: Request<API.User.Validation.Post["request"]>,
 			response: Response<{ timeLeft: number }>
 		) => {
-			if (
-				!validateParameter(request, response, [
-					"email",
-					pattern.email,
-					[1, 64],
-				])
-			)
+			if (validateParameter(request, response, [
+				"email",
+				pattern.email,
+				[1, 64],
+			]) !== true)
 				return;
 			const metadata = response.locals.session.metadata
 				? JSON.parse(response.locals.session.metadata)
@@ -307,27 +299,25 @@ Database.create().then(database => {
 
 	app.post(
 		"/api/user/history",
-		(request: Request<API.User.History.Post["request"]>, response: Response) => {
-			if (
-				!validateParameter(
-					request,
-					response,
-					["id", pattern.number],
-					["startTime", pattern.number],
-					["endTime", pattern.number]
-				)
-			)
+		(request: Request<null, API.User.History.Post["request"]>, response: Response) => {
+			if (validatePayload(
+				request,
+				response,
+				["id", Number],
+				["startTime", Number],
+				["endTime", Number]
+			) !== true)
 				return;
 			const user = response.locals.session.user;
-			if (user.id != Number(request.query.id)) {
-				response.status(401);
+			if (!user) {
+				response.sendStatus(401);
 				return;
 			}
 			const timeRecord: TimeRecord = {
-				start: Number.parseInt(request.query.startTime),
-				end: Number.parseInt(request.query.endTime),
+				start: request.body.startTime,
+				end: request.body.endTime,
 			};
-			const newsId = Number.parseInt(request.query.id);
+			const newsId = request.body.id;
 			let record = user.newsRecords?.find(
 				record => record.news.id == newsId
 			);
@@ -351,9 +341,9 @@ Database.create().then(database => {
 	//#endregion
 
 	//#region News
-	app.use("/api/news", (request: Request, response: Response, next) => {
+	app.use("/api/news", (_: Request, response: Response, next) => {
 		if (!response.locals.session?.user)
-			response.status(401);
+			response.sendStatus(401);
 		else
 			next();
 	});
@@ -364,7 +354,7 @@ Database.create().then(database => {
 			request: Request<API.News.Get["request"]>,
 			response: Response<API.News.Get["response"]>
 		) => {
-			if (!validateParameter(request, response, ["id", pattern.number]))
+			if (validateParameter(request, response, ["id", pattern.number]) !== true)
 				return;
 			const id = Number.parseInt(request.query.id);
 			database.findById(News, id).then(news => {
@@ -382,14 +372,12 @@ Database.create().then(database => {
 			request: Request<API.News.Recommendation.Get["request"]>,
 			response: Response<API.News.Recommendation.Get["response"]>
 		) => {
-			if (
-				!validateParameter(
-					request,
-					response,
-					["count", pattern.number],
-					["random", true, /^true|false$/]
-				)
-			)
+			if (validateParameter(
+				request,
+				response,
+				["count", pattern.number],
+				["random", true, /^true|false$/]
+			) !== true)
 				return;
 			const count = Number.parseInt(request.query.count);
 			const random = request.query.random === "true";
@@ -447,13 +435,11 @@ Database.create().then(database => {
 			request: Request<API.News.Analysis.Get["request"]>,
 			response: Response<API.News.Analysis.Get["response"]>
 		) => {
-			if (
-				!validateParameter(
-					request,
-					response,
-					["id", pattern.number]
-				)
-			)
+			if (validateParameter(
+				request,
+				response,
+				["id", pattern.number]
+			) !== true)
 				return;
 			const id = Number.parseInt(request.query.id);
 			database.findById(News, id).then(
@@ -462,7 +448,7 @@ Database.create().then(database => {
 						const content = news.content;
 						response.status(200).json({
 							keywords: await runner.keywords(content, 5),
-							summary: await runner.summary(content, 5),
+							summary: await runner.summary(content, 3),
 							sentiment: await runner.sentiment(content)
 						});
 					}
@@ -480,7 +466,8 @@ Database.create().then(database => {
 			request: Request<API.News.Infos.Get["request"]>,
 			response: Response<API.News.Infos.Get["response"]>
 		) => {
-			if (!validateParameter(request, response, ["ids", Array])) return;
+			if (validateParameter(request, response, ["ids", Array]) !== true)
+				return;
 			const ids = request.query.ids.map(id => Number.parseInt(id));
 			database
 				.getTable(News)
@@ -495,6 +482,11 @@ Database.create().then(database => {
 		}
 	);
 	//#endregion
+
+	app.use((_, response: Response) => {
+		if (!response.writableEnded)
+			response.sendStatus(404);
+	})
 
 	app.listen(Settings.port, () => console.log(`App listening on ${Settings.port}`));
 
