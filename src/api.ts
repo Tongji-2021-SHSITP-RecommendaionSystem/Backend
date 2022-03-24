@@ -1,8 +1,11 @@
-import type { News } from "news-recommendation-entity";
+import type { News, Reaction, User } from "news-recommendation-entity";
 
 type RecordString<T extends string> = Record<T, string>;
 export namespace API {
 	export namespace User {
+		export type Get = {
+			response: User;
+		}
 		export type Post = {
 			request: RecordString<"username" | "password" | "email" | "code">;
 			response: Record<"id", number>;
@@ -50,6 +53,17 @@ export namespace API {
 			export type Get = {
 				request: { count: string; random?: string };
 				response: Record<"ids", number[]>;
+			}
+		}
+
+		export namespace Reaction {
+			export type Get = {
+				request: RecordString<"id">;
+				response: Partial<Record<Reaction, number[]>>;
+			}
+			export type Put = {
+				requestQuery: RecordString<"id">;
+				requestBody: { reaction: Reaction };
 			}
 		}
 	}

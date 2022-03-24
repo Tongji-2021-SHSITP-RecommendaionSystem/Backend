@@ -7,7 +7,7 @@ import { In } from "typeorm";
 import { parse as parseHtml } from "node-html-parser";
 import { ParamsDictionary } from "express-serve-static-core";
 import { Runner } from "news-recommendation-core";
-import { User, News, Session, BrowsingHistory } from "news-recommendation-entity";
+import { User, News, Session, BrowsingHistory, UserReaction, Reaction } from "news-recommendation-entity";
 import { TimeRecord } from "news-recommendation-entity/src/BrowsingHistory";
 import Database from "./database";
 import { API, pattern } from "./api";
@@ -49,8 +49,10 @@ Database.create().then(database => {
 	const runner = new Runner();
 	const emailTemplate = parseHtml(FileSystem.readFileSync("email.html").toString());
 	app.enable("trust proxy");
+
 	//#region Global Middlewares
 	app.use(express.json() as any, cookieParser());
+
 	// Handle Session
 	app.use("/api", async (request, response: Response, next) => {
 		console.log({
@@ -99,6 +101,23 @@ Database.create().then(database => {
 	//#endregion
 
 	//#region User
+	app.get(
+		"/api/user",
+		(
+			_request: Request,
+			response: Response<API.User.Get["response"]>
+		) => {
+			const id = response.locals.session!.user!.id;
+			database.findById(User, id).then(
+				user => {
+					delete user.password;
+					delete user.session;
+					response.json(user);
+				},
+				handleInternalError(response)
+			);
+		}
+	);
 	app.post(
 		"/api/user",
 		(
@@ -479,6 +498,66 @@ Database.create().then(database => {
 					newses => response.json({ infos: newses }),
 					handleInternalError(response)
 				);
+		}
+	);
+
+	app.get(
+		"/api/news/reaction",
+		(
+			request: Request<API.News.Reaction.Get["request"]>,
+			response: Response<API.News.Reaction.Get["response"]>
+		) => {
+			if (validateParameter(request, response, ["id", pattern.number]) !== true)
+				return;
+			const id = Number(request.query.id);
+			database.getTable(UserReaction).find({
+				where: {
+					news: {
+						id: id
+					}
+				},
+				relations: ["user"]
+			}).then(
+				reactions => {
+					console.log(reactions);
+					const result: Partial<Record<Reaction, number[]>> = {};
+					for (const r of reactions) {
+						if (!result[r.reaction])
+							result[r.reaction] = [];
+						result[r.reaction].push(r.user.id);
+					}
+					response.json(result);
+				},
+				handleInternalError(response)
+			)
+		}
+	);
+
+	app.put(
+		"/api/news/reaction",
+		(
+			request: Request<API.News.Reaction.Put["requestQuery"], API.News.Reaction.Put["requestBody"]>,
+			response: Response
+		) => {
+			if (validateParameter(request, response, ["id", pattern.number]) !== true)
+				return;
+			if (validatePayload(request, response, ["reaction", Number]) !== true)
+				return;
+			const entity = new UserReaction();
+			entity.news = new News(Number(request.query.id));
+			entity.user = new User(response.locals.session.user.id);
+			if (request.body.reaction == Reaction.None)
+				database.getTable(UserReaction).delete(entity).then(
+					() => response.sendStatus(200),
+					handleInternalError(response)
+				);
+			else {
+				entity.reaction = request.body.reaction;
+				database.getTable(UserReaction).save(entity).then(
+					() => response.sendStatus(200),
+					handleInternalError(response)
+				)
+			}
 		}
 	);
 	//#endregion
